@@ -131,7 +131,7 @@ def sample_calls() -> list[dict]:
             "parties": [
                 {"id": "p1", "name": "Dana Reyes", "emailAddress": "Dana.Reyes@acme.com",
                  "affiliation": "External"},
-                {"id": "p2", "name": "Sam Rivera", "emailAddress": "sam@acme.com",
+                {"id": "p2", "name": "Sam Rivera", "emailAddress": "sam@northwind.com",
                  "affiliation": "Internal"},
                 {"id": "p3", "name": "Unknown Speaker"},
                 {"id": "p4", "emailAddress": "support@acme.com", "affiliation": "External"},
@@ -147,7 +147,7 @@ def sample_calls() -> list[dict]:
                 "duration": 3600,
             },
             "parties": trainees + [
-                {"id": "p2", "name": "Sam Rivera", "emailAddress": "sam@acme.com",
+                {"id": "p2", "name": "Sam Rivera", "emailAddress": "sam@northwind.com",
                  "affiliation": "Internal"},
             ],
         },

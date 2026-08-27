@@ -15,14 +15,14 @@ from quorom.config import Config
 from quorom.gong.importer import import_range
 from quorom.weekly.run import run_weekly
 
-ACCOUNT = "acme.com"
+ACCOUNT = "northwind.com"
 
 
 def _seed_account(dsn: str) -> str:
     with psycopg.connect(dsn, autocommit=True) as conn:
         row = conn.execute(
             "insert into accounts (name, internal_domains) values (%s, %s) returning id",
-            (ACCOUNT, ["acme.com"]),
+            (ACCOUNT, ["northwind.com"]),
         ).fetchone()
     return str(row[0])
 
@@ -43,7 +43,7 @@ def _import(dsn: str, account_id: str, gong_calls, database_conn=None):
 
     with psycopg.connect(dsn) as conn:
         result = import_range(
-            conn, FakeGong(gong_calls), account_id, ["acme.com"],
+            conn, FakeGong(gong_calls), account_id, ["northwind.com"],
             "2025-10-01", "2026-08-24", log=lambda *_: None,
         )
         conn.commit()
@@ -77,7 +77,7 @@ def test_import_classifies_and_resolves(database, gong_calls):
                 "select email from people where email is not null"
             ).fetchall()
         }
-        assert "sam@acme.com" not in emails
+        assert "sam@northwind.com" not in emails
         assert {"dana.reyes@acme.com", "d.reyes@acme.com"} <= emails
 
         # The name-only attendee gets an unmatched person of its own.
@@ -165,7 +165,7 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     assert dump["focus_profile"]["employee_count_min"] == 200
 
     html = open(paths["html"]).read()
-    assert "acme.com" in html          # the account, not a hardcoded name
+    assert "northwind.com" in html     # the account, not a hardcoded name
     assert "not for publishing" in html
 
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -18,7 +19,23 @@ try:  # dotenv is a local convenience, not a dependency of a deployed run
 
     load_dotenv()
 except Exception:  # pragma: no cover
-    pass
+    # A deployed run reads its environment's secret store, has no .env, and
+    # should say nothing. The other case is a reader who followed the setup
+    # guide, wrote a .env, and installed without the `dev` extra: their file is
+    # about to be ignored in silence, and the only symptom is a later
+    # "Missing environment: ..." naming variables that are in fact set
+    # correctly in the file. Say it here instead, where it is still actionable.
+    #
+    # The file is never opened — its existence is the whole signal, and no
+    # value from it may reach the terminal.
+    if os.path.isfile(".env"):
+        print(
+            "[!] python-dotenv is not installed, so the .env file in this "
+            "directory is being ignored.\n"
+            "    Values must come from the environment until you install it: "
+            "pip install -e '.[dev]'",
+            file=sys.stderr,
+        )
 
 
 def _int(name: str, default: int) -> int:

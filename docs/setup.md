@@ -200,9 +200,26 @@ On the machine that will run the pipeline:
 ```bash
 git clone https://github.com/saaswise-cc/quorom.git
 cd quorom
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e .
+python3.12 -m venv .venv && source .venv/bin/activate   # any 3.11+ will do
+python -m pip install --upgrade pip
+pip install -e '.[dev]'
 ```
+
+**Name the interpreter, and upgrade pip inside the venv.** Both lines are load-
+bearing on a stock Mac. `python3` there is 3.9 — section 3 had you check exactly
+that — and a 3.9 venv carries pip 21.2.4, which predates the standard this
+project's editable install needs. The failure does not mention Python or pip; it
+says `File "setup.py" or "setup.cfg" not found`, which sends you looking for a
+missing file that is not supposed to exist. Upgrading pip first is what turns
+that into a working install or an honest "requires a different Python" message.
+
+**Why `.[dev]` and not `.`** — `python-dotenv` lives in the `dev` extra, and it
+is what reads the `.env` file you are about to write in section 9. Install with
+a bare `pip install -e .` and there is no `.env` support at all: the file is
+read by nothing, and the first symptom is section 10 reporting `DATABASE_URL`
+and `ACCOUNT_DOMAIN` missing while both sit correctly in the file. A deployed
+run is the case that genuinely wants the bare install — it takes its values
+from your environment's secret store and never has a `.env` to read.
 
 That gives you the `quorom` command. Check it:
 
@@ -235,6 +252,33 @@ You should see eight tables: `accounts`, `meetings`, `attendees`, `people`,
 
 Migrations are append-only once applied — your database is yours, not ours, and
 cannot be rebuilt from scratch to accommodate an edit.
+
+### Checking the install
+
+The test suite is the one way to confirm the code works on your machine before
+you point it at live systems. It needs the `dev` extra, which you installed
+above:
+
+```bash
+pytest
+```
+
+That gives **137 passed, 21 skipped**, and the skips matter: those 21 are the
+tests that need a real PostgreSQL, and they skip silently when they cannot find
+one. A run that skips them is green on any machine with no database, which is to
+say green almost everywhere, including where something is genuinely broken. To
+run all 158, point `QUOROM_TEST_DSN` at a Postgres and run it again:
+
+```bash
+export QUOROM_TEST_DSN=postgresql://postgres@localhost:5432/postgres
+pytest
+```
+
+Expect **158 passed**. Anything else is worth stopping for.
+
+> **Not your product database.** The suite creates and drops its own databases
+> on whatever server that DSN names. Give it a scratch Postgres — a container is
+> ideal — never the deployment you set up above.
 
 ---
 
@@ -310,11 +354,27 @@ list. Known levels: `c-level`, `cxo`, `cro`, `vp`, `director`, `founder`,
 typo matches nobody and every company's bench comes back empty. `init` warns
 about that rather than letting you find it in an artifact.
 
-What you should see: three `[✓]` lines — the account, the focus profile, and
-the field map with the fields it resolved and the percentage of records
-populating each. Read that third block. It is the only place you will see which
-field the pipeline decided means "employee count" in your org, and whether that
-was right.
+What you should see, **with Salesforce configured**: three `[✓]` lines — the
+account, the focus profile, and the field map with the fields it resolved and
+the percentage of records populating each. Read that third block. It is the only
+place you will see which field the pipeline decided means "employee count" in
+your org, and whether that was right.
+
+**Without Salesforce configured** you get two `[✓]` and one `[i]`, and that is a
+successful run, not a failed one:
+
+```
+[✓] Account acme.com created · internal domains: acme.com, acme.io
+[✓] Focus profile v1 created · 200-10000 employees · NA · c-level, vp, director
+[i] Salesforce not configured — no field map resolved.
+[*] Next: quorom import
+```
+
+The `[i]` is the third block telling you it had nothing to resolve against. The
+account and the profile are written and `quorom import` will run. What you do
+not have is a field map, and section 7 is the reason to care: configure
+Salesforce later and the weekly run will stop until you have run
+`quorom resolve-fields`.
 
 **Re-running it** with the same arguments writes nothing. With a *different*
 profile it refuses: the profile decides which companies appear on the map, so
@@ -440,8 +500,9 @@ and then never done.
 
 | What you see | What it is |
 |---|---|
-| `[!] Missing environment: DATABASE_URL, ACCOUNT_DOMAIN` | Those two are required before anything runs. |
+| `[!] Missing environment: DATABASE_URL, ACCOUNT_DOMAIN` | **Check first: are they set in a `.env`, and did you install with `pip install -e .` rather than `pip install -e '.[dev]'`?** Without the extra, `python-dotenv` is absent and the whole file is ignored, so correctly-set values are reported missing. `quorom` now warns about this on stderr when a `.env` is present. Otherwise: those two are required before anything runs, and an exported shell variable beats the file. |
 | `[!] The schema is not there. Apply the migrations first` | Section 8. |
+| `ERROR: File "setup.py" or "setup.cfg" not found. Directory cannot be installed in editable mode` (with `(A "pyproject.toml" file was found, but editable mode currently requires a setuptools-based build.)`) | Your `pip` is too old for an editable install, which almost always means the venv was built by a too-old Python. Nothing is missing from the repository — there is deliberately no `setup.py`. `python -m pip --version` and `python -V` inside the venv; if Python is below 3.11, rebuild the venv with an explicit `python3.12 -m venv .venv`. Section 8. |
 | `[!] No account named '<x>'. Run 'quorom init' first.` | `ACCOUNT_DOMAIN` does not match any account row — either you skipped `init`, or the value changed since. |
 | `accounts.internal_domains is empty` | `init` did not run, or ran without `--internal-domains`. Every attendee would be classified external. |
 | A run stops before doing anything, complaining about the focus profile | There is no active profile. This is a hard error on purpose: an absent profile makes the ICP test pass everything, and the output would look entirely normal and be wrong. |

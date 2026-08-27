@@ -172,7 +172,7 @@ def test_the_run_refuses_a_profile_whose_geography_it_cannot_act_on(
     with psycopg.connect(database, autocommit=True) as conn:
         account_id = str(conn.execute(
             "insert into accounts (name, internal_domains) values (%s, %s) returning id",
-            (ACCOUNT, ["acme.com"]),
+            (ACCOUNT, ["northwind.com"]),
         ).fetchone()[0])
         conn.execute(
             "insert into user_focus_profiles (account_id, version_number, is_active, "

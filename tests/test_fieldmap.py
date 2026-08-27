@@ -385,7 +385,7 @@ def _seed(dsn: str) -> str:
     with psycopg.connect(dsn, autocommit=True) as conn:
         row = conn.execute(
             "insert into accounts (name, internal_domains) values (%s, %s) returning id",
-            (ACCOUNT, ["acme.com"]),
+            (ACCOUNT, ["northwind.com"]),
         ).fetchone()
         conn.execute(
             "insert into user_focus_profiles (account_id, version_number, is_active, "

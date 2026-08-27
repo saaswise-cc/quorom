@@ -47,7 +47,7 @@ HS_RECORD = {
 
 def _sf(linkedin: bool = True) -> Salesforce:
     cfg = Config(
-        database_url="postgresql:///x", account="acme.com",
+        database_url="postgresql:///x", account="northwind.com",
         salesforce=SalesforceConfig(access_token="t", instance_url="https://x"),
     )
     return Salesforce(cfg, FieldMap(
@@ -208,7 +208,7 @@ def test_the_stakeholder_row_is_built_from_the_contact(tmp_path):
                         email="sam@acme.com", linkedin=None),
             ]
 
-    cfg = Config(database_url="postgresql:///x", account="acme.com", shortlist_size=3)
+    cfg = Config(database_url="postgresql:///x", account="northwind.com", shortlist_size=3)
     rows, raw = build(
         cfg, [{"domain": "acme.com", "name": "Acme", "is_target": True, "met": 1}],
         ["VP"], {}, _Bench(),

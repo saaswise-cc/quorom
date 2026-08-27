@@ -23,7 +23,7 @@ TODAY = dt.date(2026, 8, 25)
 
 
 def _cfg(recent_days: int = 90) -> Config:
-    return Config(database_url="postgresql:///x", account="acme.com",
+    return Config(database_url="postgresql:///x", account="northwind.com",
                   recent_days=recent_days)
 
 
@@ -140,11 +140,11 @@ def test_cli_import_with_no_arguments_uses_the_recent_window(
     with psycopg.connect(database, autocommit=True) as conn:
         conn.execute(
             "insert into accounts (name, internal_domains) values (%s, %s)",
-            ("acme.com", ["acme.com"]),
+            ("northwind.com", ["northwind.com"]),
         )
 
     monkeypatch.setenv("DATABASE_URL", database)
-    monkeypatch.setenv("ACCOUNT_DOMAIN", "acme.com")
+    monkeypatch.setenv("ACCOUNT_DOMAIN", "northwind.com")
     monkeypatch.setenv("RECENT_DAYS", "90")
     monkeypatch.setenv("GONG_ACCESS_KEY", "k")
     monkeypatch.setenv("GONG_ACCESS_KEY_SECRET", "s")

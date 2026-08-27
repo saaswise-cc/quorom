@@ -30,7 +30,7 @@ PROFILE = dict(
 
 def _init(dsn: str, *, replace: bool = False, **overrides) -> bootstrap.InitResult:
     kwargs = {**PROFILE, **overrides}
-    domains = kwargs.pop("internal_domains", ["acme.com"])
+    domains = kwargs.pop("internal_domains", ["northwind.com"])
     cfg = Config(database_url=dsn, account=ACCOUNT)
     with psycopg.connect(dsn) as conn:
         result = bootstrap.init_deployment(
@@ -56,7 +56,7 @@ def test_init_writes_what_the_pipeline_reads(database):
     cfg = Config(database_url=database, account=ACCOUNT)
     with psycopg.connect(database) as conn:
         assert db.account_id(conn, cfg) == result.account_id
-        assert db.internal_domains(conn, cfg) == ["acme.com"]
+        assert db.internal_domains(conn, cfg) == ["northwind.com"]
         assert db.focus_profile(conn, cfg) == {
             "employee_count_min": 200,
             "employee_count_max": 10000,
@@ -120,14 +120,14 @@ def test_adding_a_domain_does_not_version_the_profile(database):
     """A domain the account acquired is not a change of ICP, so it needs no
     --replace and leaves the profile at the version that produced last week."""
     first = _init(database)
-    result = _init(database, internal_domains=["acme.com", "acme.io"])
+    result = _init(database, internal_domains=["northwind.com", "northwind.io"])
 
     assert (result.account, result.profile) == ("updated", "unchanged")
     assert result.account_id == first.account_id
 
     cfg = Config(database_url=database, account=ACCOUNT)
     with psycopg.connect(database) as conn:
-        assert db.internal_domains(conn, cfg) == ["acme.com", "acme.io"]
+        assert db.internal_domains(conn, cfg) == ["northwind.com", "northwind.io"]
         assert _profile_rows(conn) == [(1, True)]
 
 
@@ -173,7 +173,7 @@ def _seed_account_only(dsn: str) -> str:
     with psycopg.connect(dsn, autocommit=True) as conn:
         row = conn.execute(
             "insert into accounts (name, internal_domains) values (%s, %s) returning id",
-            (ACCOUNT, ["acme.com"]),
+            (ACCOUNT, ["northwind.com"]),
         ).fetchone()
     return str(row[0])
 
@@ -257,7 +257,7 @@ def test_cli_init_reports_and_then_refuses_to_repeat(database, monkeypatch, caps
     monkeypatch.setenv("ACCOUNT_DOMAIN", ACCOUNT)
     argv = [
         "init",
-        "--internal-domains", "acme.com,acme.io",
+        "--internal-domains", "northwind.com,northwind.io",
         "--employee-min", "200",
         "--employee-max", "10000",
         "--geographies", "North America",
@@ -266,7 +266,7 @@ def test_cli_init_reports_and_then_refuses_to_repeat(database, monkeypatch, caps
 
     assert main(argv) == 0
     out = capsys.readouterr().out
-    assert "Account acme.com created" in out
+    assert "Account northwind.com created" in out
     assert "Focus profile v1 created" in out
     assert "quorom import" in out          # the next step, not just the failure
 
