@@ -58,10 +58,10 @@ unfriendliness — see `LICENSE` and the README.
 Four things. The first three take minutes; the fourth is the rest of this guide.
 
 1. **A Claude project** — where you and an agent do the setup and, afterwards,
-   read the output.
-2. **A Linear project** — where the work and the open questions are tracked.
-3. **A repository in your own version control** — config, secret references,
+   read the output. First, so the agent is with you for the rest.
+2. **A repository in your own version control** — config, secret references,
    your pipeline. Per section 1.
+3. **A Linear project** — where the work and the open questions are tracked.
 4. **A running deployment** — a PostgreSQL database, the pipeline installed
    against it, and a schedule that runs it.
 
@@ -92,28 +92,13 @@ Salesforce or HubSpot — data you already own. No enrichment provider is called
 
 ---
 
-## 4. Step 1 — Your repository
+## 4. Step 1 — The Claude project
 
-Create an empty repository in your own version control. What goes in it:
-
-```
-.env.example        # copied from upstream, filled in with YOUR values —
-                    # names and non-secret values only, never a secret
-deploy/             # your pipeline: however the code reaches a machine
-schedule/           # your scheduled job definitions
-README.md           # what this deployment is, who owns it, where the output goes
-```
-
-What does **not** go in it: any file from `quorom/`, `migrations/`, `tests/` or
-`docs/`. Those are read from upstream. If you find yourself copying one in to
-change a line, stop and re-read section 1.
-
-Record in your README which upstream commit or tag you are running. When you
-update, that is the thing you move.
-
----
-
-## 5. Step 2 — The Claude project
+**Do this one first.** Once the project points at this repository, everything
+after it is done with an agent that has already read this guide sitting
+alongside you — including the steps that are fiddlier than they look. That is
+the working arrangement section 2 describes and the rest of this document
+assumes.
 
 Create a project in Claude. Give it these instructions — this is the text that
 makes an agent in the project useful rather than guessing:
@@ -143,8 +128,71 @@ House rules for this project:
 - Do not add columns, scores or features that were not asked for.
 ```
 
+> **`<YOUR REPO URL>` does not exist yet, and that is fine.** You create that
+> repository in step 2. Leave the placeholder alone for now and fill it in when
+> you have the address. Nothing in this step waits on it, and the agent is
+> useful without it — the line that matters here is the upstream one. Everything
+> else in the template you can fill in immediately.
+
+**Pointing the project at this repository is just the URL.** It is a public
+repository on GitHub. There is no connector to authorise, no token to issue, no
+integration to install, no permission to grant and no setting to go and find.
+The address in the instructions above is the whole mechanism: an agent can read
+the code, the migrations and these docs from it directly. If you are hunting for
+a configuration screen, stop — there isn't one.
+
+**Do not upload files from this repository into the project as knowledge
+documents.** It is a tempting shortcut and it goes wrong quietly. An uploaded
+file is a copy, frozen at the moment you uploaded it. The first time upstream
+changes, your copy is silently wrong, and from then on everyone in the project
+is following a stale document in good faith — with no diff, no warning and no
+merge path back. That is the fork problem of section 1 in a different costume:
+same drift, same silence, same dead end. The project *references* the
+repository; it never *contains* it. When you need the current text of a file,
+have the agent read it at the URL.
+
+### Reading it and running it are different things
+
+The guide asks you to do both, and they are easy to conflate. They need
+completely different things:
+
+| Activity | What it needs |
+|---|---|
+| **Reading** — how does this behave, what does that flag do, what does `0002` create, why is it shaped this way | The URL. Nothing else. No clone, no credentials, no database. |
+| **Executing** — applying the migrations, `quorom init`, `quorom import`, `quorom weekly` | A clone on a machine that can reach your database, Gong and Salesforce. That is step 5, in section 8. |
+
+Asking an agent what `RECENT_DAYS` does, or what a column on tab 3 means, needs
+nothing but the address — no setup, no access, and you can do it right now.
+Running the weekly job needs a machine, a database, a virtualenv and real
+credentials, and the agent in your Claude project is not on that machine unless
+you have put it there yourself.
+
 Add the Linear MCP if your team uses it, so the agent can read the project
 below. Nothing in the pipeline requires it.
+
+---
+
+## 5. Step 2 — Your repository
+
+Create an empty repository in your own version control. What goes in it:
+
+```
+.env.example        # copied from upstream, filled in with YOUR values —
+                    # names and non-secret values only, never a secret
+deploy/             # your pipeline: however the code reaches a machine
+schedule/           # your scheduled job definitions
+README.md           # what this deployment is, who owns it, where the output goes
+```
+
+What does **not** go in it: any file from `quorom/`, `migrations/`, `tests/` or
+`docs/`. Those are read from upstream. If you find yourself copying one in to
+change a line, stop and re-read section 1.
+
+Record in your README which upstream commit or tag you are running. When you
+update, that is the thing you move.
+
+Once it exists, put its address into `<YOUR REPO URL>` in your Claude project
+instructions from step 1.
 
 ---
 
@@ -153,8 +201,8 @@ below. Nothing in the pipeline requires it.
 Create a project for the deployment. It is where the two questions this guide
 cannot answer for you get tracked and closed:
 
-- **What runs the scheduled job** (section 12).
-- **Where the finished file lands** (section 13). This one decides whether
+- **What runs the scheduled job** (section 13).
+- **Where the finished file lands** (section 14). This one decides whether
   anyone reads the output at all.
 
 ---
