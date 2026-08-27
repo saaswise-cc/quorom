@@ -36,7 +36,8 @@ from .fieldmap import FieldMap
 TIMEOUT = 60
 
 # Field names/labels that would hint at LinkedIn connection tracking, if any org
-# had it. Kept identical to the M2 spike so the two runs' JSON dumps match.
+# had it. The pattern is deliberately broad: it is used to flag candidates for a
+# human to look at, not to pick a field automatically.
 _LI_TRACKING_HINT = re.compile(
     r"(linkedin|connect|invite|invitation|network|sales_?nav|social|outreach|sequence)",
     re.I,
@@ -58,11 +59,10 @@ ACCOUNT_STANDARD = ["Name", "Type"]
 def soql_quote(value: str) -> str:
     """Escape a value for a SOQL string literal.
 
-    The M2 spike interpolated emails and domains straight into SOQL. The values
-    come from our own database rather than a user, so it was not exploitable,
-    but an apostrophe in an address was enough to break a run — and a pipeline
-    that reads a customer's CRM should not be one quote away from a malformed
-    query.
+    Emails and domains reach these queries from the meetings database rather
+    than from user input, so interpolating them raw was never exploitable — but
+    an apostrophe in an address was enough to break a run, and a pipeline that
+    reads your CRM should not be one quote away from a malformed query.
     """
     return value.replace("\\", "\\\\").replace("'", "\\'")
 
@@ -98,8 +98,9 @@ class Salesforce:
         if self._token:
             return self._token, self._instance
 
-        # Pilot path: a token pasted from `sf org display`. Expires in ~2 hours;
-        # a 401 mid-run means the token died, not that the network failed.
+        # By-hand path: a token pasted from `sf org display`. Expires in ~2
+        # hours; a 401 mid-run means the token died, not that the network
+        # failed.
         if self._cfg.access_token and self._cfg.instance_url:
             self._token, self._instance = self._cfg.access_token, self._cfg.instance_url
             return self._token, self._instance

@@ -4,7 +4,7 @@
 -- The README's rule (CRM field map): the pipeline never hardcodes a
 -- non-standard field name. A field that does not exist raises INVALID_FIELD and
 -- kills the whole query rather than blanking a column, so a hardcoded custom
--- name is a run that dies at the next customer — and it is per-customer
+-- name is a run that dies at the next deployment — and it is per-deployment
 -- differentiation living in code, which forces the fork this repository bans.
 -- The repository holds the patterns; the resolved names live here.
 --
@@ -43,7 +43,7 @@ create table crm_field_maps (
   --                "hq_country": [...], "hq_city": [...], "hq_state": [...]},
   --    "Contact": {"linkedin_url": [...]}}
   -- A LIST per logical field, best-populated first, not a single name: the
-  -- first populated value wins at read time. Measured on the pilot org, three
+  -- first populated value wins at read time. Measured on one real org, three
   -- of thirty-nine companies met in one week have an empty package country and
   -- a populated BillingCountry, and a single-name map would blank their HQ and
   -- drop one out of the ICP set.
@@ -52,7 +52,7 @@ create table crm_field_maps (
   -- Read by a human, and by the JSON dump the artifact ships. Per logical
   -- field: what it serves, every candidate with its populated-row count and
   -- percentage, and every field rejected with the rule that rejected it. This
-  -- is what makes the choice arguable instead of trusted — on the pilot org the
+  -- is what makes the choice arguable instead of trusted — on one real org the
   -- best-populated field matching /linkedin/ on Contact is the *company's*
   -- page, and the record of why it was rejected is the only way to see that.
   provenance     jsonb       not null,

@@ -1,7 +1,7 @@
 # Migrations
 
-The v1 schema. Applied once per customer deployment, against a database in that
-customer's own environment. There is no Quorom-owned database.
+The v1 schema. Applied once per deployment, against a database in your own
+environment. There is no Quorom-owned database.
 
 Apply in filename order:
 
@@ -29,9 +29,9 @@ already satisfied by real rows.
 ## Assumptions
 
 - **PostgreSQL.** `gen_random_uuid()` (core since 13), `text[]`, `jsonb` and a
-  partial unique index. The README says the engine is per-customer and not
-  necessarily Neon; it does say Postgres, and this schema assumes that. A
-  non-Postgres customer is a porting exercise, not a config change.
+  partial unique index. The README says the engine is your choice and not
+  necessarily a managed one; it does say Postgres, and this schema assumes
+  that. A non-Postgres engine is a porting exercise, not a config change.
 - **Single tenant per deployment.** No row-level security, no `auth.uid()`, no
   `users` table. `account_id` is kept on every table so the same queries ship
   everywhere, but one deployment holds one account.
@@ -56,5 +56,5 @@ with no reader named should not be added.
 ## Adding one
 
 Next file is `0005_`. Migrations are append-only once a deployment has run
-them — the database belongs to the customer, not to us, and cannot be rebuilt
-from scratch to accommodate an edit.
+them — the database is yours, holds your live data, and cannot be rebuilt from
+scratch to accommodate an edit.

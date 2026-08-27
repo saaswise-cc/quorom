@@ -2,25 +2,23 @@
 --
 -- The focus profile drives the whole product: it decides which companies are
 -- ICP fits (employee band + HQ geography) and which titles clear the seniority
--- bar for the stakeholder list. In the M2 spike it is read from v0's shared
--- hosted database as a shortcut. Here it lives in the customer's own database,
--- read over the same connection as the meeting data — which is what makes that
--- a connection-string change rather than a code change.
+-- bar for the stakeholder list. It lives in your own database, read over the
+-- same connection as the meeting data — so pointing the pipeline at a
+-- different deployment is a connection-string change, not a code change.
 --
--- This is the per-account ICP config, NOT v0's per-contact focus *scoring*
--- feature. Scoring is out of scope; the profile is core.
+-- This is per-account ICP configuration: which companies count, and which
+-- titles are senior enough to list. It is not per-contact scoring — there is
+-- no such feature here, and the profile is not a ranking input.
 --
--- Provenance: v0 `20260413000000_user_focus_profiles.sql` (shape),
--- `m2-weekly/weekly_stakeholder_map.py` load_focus_profile() + meets_profile()
--- + seniority_terms() (read surface).
+-- Read by FOCUS_PROFILE_SQL in quorom/db.py, and applied in
+-- quorom/weekly/stakeholders.py.
 --
--- Departure from v0: the profile is scoped to the ACCOUNT, not to a user.
--- v0 keyed it on `user_id` with a unique-active index per user and RLS policies
--- on `auth.uid()`. v1 has no hosted auth and no `users` table, and the pipeline
--- already selects on (account, is_active, max version) without reference to a
--- user — so the user column would be a foreign key to nothing, guarding a
--- distinction the read path never makes. On the org this was measured against
--- there is exactly one profile row, so nothing is lost in the migration.
+-- The profile is scoped to the ACCOUNT, not to a user. A per-user profile
+-- would need a `users` table and a hosted auth system to key off, and this
+-- deploys single-tenant with neither; the pipeline already selects on
+-- (account, is_active, max version) without reference to a user, so a user
+-- column would be a foreign key to nothing, guarding a distinction the read
+-- path never makes. In practice a deployment has exactly one active profile.
 
 create table user_focus_profiles (
   id             uuid primary key default gen_random_uuid(),
@@ -37,8 +35,8 @@ create table user_focus_profiles (
   --   hq_geographies                           -> the HQ geography test
   --   focus_seniority                          -> the Salesforce Title LIKE clause
   --                                               behind the senior CRM bench
-  -- Left as jsonb: the profile's shape is customer configuration, and pinning it
-  -- into columns would put per-customer differentiation in the schema.
+  -- Left as jsonb: the profile's shape is configuration, and pinning it into
+  -- columns would put per-deployment differentiation in the schema.
   profile_data   jsonb       not null,
 
   note           text,
@@ -54,7 +52,7 @@ create unique index user_focus_profiles_one_active
   on user_focus_profiles (account_id)
   where is_active;
 
--- The table keeps v0's name so the migration is a straight copy and the
--- pipeline's existing query is unchanged. It is account-scoped despite the
--- 'user_' prefix; renaming it is a cosmetic change that can happen once the
--- data load is done, not during it.
+-- The 'user_' prefix is historical: the table is account-scoped, not per-user,
+-- and nothing reads it per-user. The name is kept so that an existing data
+-- load and the pipeline's query stay unchanged; renaming it is a cosmetic
+-- change, better done once a load is finished than in the middle of one.

@@ -1,4 +1,4 @@
-"""Domain classification — ported from v0 `src/lib/shared/domain-classification.ts`.
+"""Domain classification.
 
 An attendee is internal (an employee), personal (a consumer mailbox), or
 external. Only external attendees reach the artifact, so this function decides

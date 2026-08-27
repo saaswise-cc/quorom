@@ -1,20 +1,20 @@
-"""Identity resolution — ported from v0 `src/lib/shared/deduplicate-attendees.ts`.
+"""Identity resolution.
 
 Collapses attendee sightings onto canonical person records. An attendee is one
 appearance at one meeting; a person is a human, who may appear under more than
 one email address over time.
 
-Two departures from v0, both forced by v1's schema:
+Two things to know about how it writes:
 
-  * v0 wrote `people.company_domain`. v1 has no such column — company grouping
-    is by `attendees.domain` and nothing joins a company table (see the root
+  * There is no `people.company_domain`. Company grouping is by
+    `attendees.domain`, and nothing joins a company table (see the root
     README, build item 1).
 
-  * v0 inserts into `person_attendees` with no uniqueness constraint.
-    migrations/0002 adds `unique (person_id, attendee_id)`, so this uses
-    ON CONFLICT DO NOTHING. Without it, re-importing an overlapping date range
-    fails on the second run rather than the first — the failure mode that makes
-    a backfill look fine and then breaks the overnight job a day later.
+  * `person_attendees` carries `unique (person_id, attendee_id)`
+    (migrations/0002), and the insert below uses ON CONFLICT DO NOTHING.
+    Without a uniqueness constraint here, re-importing an overlapping date
+    range silently double-writes the link rows — the failure mode that makes a
+    backfill look fine and then skews the history a day later.
 """
 
 from __future__ import annotations

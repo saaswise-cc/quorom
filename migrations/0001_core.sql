@@ -1,38 +1,38 @@
 -- Quorom v1 — 0001_core: accounts, meetings, attendees
 --
--- Designed backwards from what the pipeline reads, not forwards from v0's
--- schema. Every column below is either read by a column of the stakeholder-map
--- artifact or written by the Gong importer that produces it. Anything in v0
--- that neither reads nor writes was left out; a later migration adds a column
--- when a read path needs it.
+-- Designed backwards from what the pipeline reads. Every column below is either
+-- read by a column of the stakeholder-map artifact or written by the Gong
+-- importer that produces it; nothing is here speculatively. When a read path
+-- later needs a column, a later migration adds it.
 --
--- Provenance for the shape: v0 `migrations/20260330000000_core_schema.sql`
--- (tables), `src/lib/gong/process-gong-import.ts` (write surface),
--- `m2-weekly/weekly_stakeholder_map.py` MEETINGS_SQL + MET_HISTORY_SQL (read surface).
+-- The write surface is quorom/gong/importer.py. The read surface is
+-- WEEK_ATTENDEES_SQL and MET_HISTORY_SQL in quorom/db.py — the two queries the
+-- weekly run makes against these tables.
 --
--- Deliberate departures from v0, each with a reason:
+-- The design decisions worth knowing about, each with its reason:
 --
---   * No RLS, no `auth.uid()`, no `current_account_id()`. v0's policies bind the
---     schema to its hosting platform's auth schema. v1 deploys single-tenant
---     inside the customer's environment with account-scoped keys read from the
---     environment, so row-level isolation has no user to key off and would not
---     run on a plain Postgres.
+--   * No row-level security, and no dependency on a hosting platform's auth
+--     schema. Quorom deploys single-tenant inside your own environment, with
+--     account-scoped keys read from the environment rather than per-user
+--     sessions — so row-level isolation has no user to key off, and policies
+--     written against a managed platform's auth functions would not run on the
+--     plain Postgres this is designed for.
 --
---   * No credential columns. v0 `accounts` carried zoom/google/salesforce OAuth
---     tokens, an enrichment-provider API key and `stripe_customer_id`; v0 also
---     stored per-account Gong keys (`configure_gong`). The README's rule is that
---     secrets are read from the environment and never committed — so Gong,
---     Salesforce, HubSpot and provider credentials are env config in v1, not rows.
+--   * No credential columns. `accounts` holds no OAuth tokens, no enrichment
+--     provider API key, no billing id, and no per-account Gong keys. The
+--     README's rule is that secrets are read from the environment and never
+--     committed — so Gong, Salesforce, HubSpot and provider credentials are env
+--     config, not rows.
 --
---   * `provider` and `domain_kind` are text + CHECK, not enums. v0 needed three
---     separate `alter type ... add value` migrations to add gong/teams/other, and
---     the pipeline casts `a.domain_kind::text` on every read to get around the
---     enum. A CHECK constraint extends with a plain ALTER and drops the cast.
+--   * `provider` and `domain_kind` are text + CHECK, not enums. Extending a
+--     Postgres enum costs an `alter type ... add value` migration per value,
+--     and comparing one in a query means casting `domain_kind::text` on every
+--     read. A CHECK constraint extends with a plain ALTER and drops the cast.
 --
---   * `accounts` keeps its id and the account_id foreign keys even though a
---     single-tenant deploy has exactly one row. Keeping the column is what lets
---     the same schema and the same queries ship to every customer — differentiation
---     by config, never code.
+--   * `accounts` keeps its id, and the account_id foreign keys stay, even though
+--     a single-tenant deploy has exactly one row. Keeping the column is what
+--     lets the same schema and the same queries ship to every deployment —
+--     differentiation by config, never code.
 
 create table accounts (
   id               uuid primary key default gen_random_uuid(),
@@ -50,7 +50,7 @@ create table meetings (
   id          uuid primary key default gen_random_uuid(),
   account_id  uuid not null references accounts(id) on delete cascade,
 
-  -- Written by: the importer. 'gong' is the only value the pilot produces;
+  -- Written by: the importer. 'gong' is the only value it produces today;
   -- the others are carried so a second source does not need a migration.
   provider    text not null
                 check (provider in ('gong', 'zoom', 'google_meet', 'teams', 'other')),
@@ -59,9 +59,10 @@ create table meetings (
   -- does not duplicate meetings.
   provider_id text not null,
 
-  -- Read by: MEETINGS_SQL (the meeting titles aggregated per person on tab 1).
+  -- Read by: WEEK_ATTENDEES_SQL (the meeting titles aggregated per person on
+  -- tab 1).
   title       text,
-  -- Read by: MEETINGS_SQL (the week window) and MET_HISTORY_SQL
+  -- Read by: WEEK_ATTENDEES_SQL (the week window) and MET_HISTORY_SQL
   -- (first_met / last_met, and the recency test behind 'Recent contact?').
   start_time  timestamptz,
 
@@ -77,8 +78,9 @@ create table meetings (
   unique (account_id, provider, provider_id)
 );
 
--- MEETINGS_SQL filters one week by start_time within an account; MET_HISTORY_SQL
--- scans all of an account's meetings (1,942 rows on one real org).
+-- WEEK_ATTENDEES_SQL filters one week by start_time within an account;
+-- MET_HISTORY_SQL scans all of an account's meetings (1,942 rows on one
+-- real org).
 create index meetings_account_start_idx on meetings (account_id, start_time);
 
 create table attendees (

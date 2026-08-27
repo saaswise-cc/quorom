@@ -1,12 +1,11 @@
-"""Gong import — ported from v0 `src/lib/gong/process-gong-import.ts`, phase 1.
+"""Gong import.
 
 Writes `meetings` and `attendees`, and resolves people through identity.py.
 This is the only part of the system that writes; everything else reads.
 
-What did not come across: the entire transcript phase (v0 lines 252-345, plus
-buildSpeakerMap, flattenTranscript and their types — roughly a third of the
-file). v1 stores no transcripts, so the code that fetched, flattened and stored
-them has nothing to write to.
+Deliberately absent: any handling of transcripts. Quorom stores meeting
+metadata and attendees only, so there is nothing here that fetches, flattens
+or stores transcript text, and `meetings` has no column to put it in.
 
 Idempotency has two layers, because a backfill and an overnight run will overlap:
   * the meeting upsert keys on (account_id, provider, provider_id);

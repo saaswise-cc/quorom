@@ -1,9 +1,8 @@
-"""Gong API client — ported from v0 `src/lib/gong/client.ts`.
+"""Gong API client.
 
-Two endpoints, not three. v0's `getCallTranscripts` and everything downstream of
-it is deliberately absent: transcripts and transcript_moments are out of scope
-for v1, and `meetings` has no transcript column to put them in. That is roughly
-a third of v0's Gong code that does not come across.
+Two endpoints: the call list and call details. Gong's transcript endpoint is
+deliberately not called — Quorom stores meeting metadata and attendees, not
+transcript text, and `meetings` has no column to put it in.
 """
 
 from __future__ import annotations

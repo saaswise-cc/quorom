@@ -73,8 +73,8 @@ CONTACT_FIELDS = [
 ]
 
 # How many rows have each field populated. The numbers are the org-wide shape
-# measured on the pilot: standard wins on employees, the package on city/state,
-# and the two country fields are all but tied.
+# measured on one real org: standard wins on employees, the package on
+# city/state, and the two country fields are all but tied.
 POPULATED = {
     ("Account", "NumberOfEmployees"): 141290,
     ("Account", "Pkg__Employee_Count__c"): 111715,
@@ -250,7 +250,7 @@ def test_counting_is_a_real_aggregate_per_candidate():
 
 
 def test_the_first_populated_candidate_wins():
-    """Why the map holds a list and not a winner. Measured on the pilot org,
+    """Why the map holds a list and not a winner. Measured on one real org,
     three of thirty-nine companies met in a week have an empty package country
     and a populated BillingCountry; a single-name map blanks their HQ."""
     fm = FieldMap({"Account": {"hq_country": ["Pkg__Company_Country__c", "BillingCountry"]}})

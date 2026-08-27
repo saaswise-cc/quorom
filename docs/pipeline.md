@@ -25,9 +25,9 @@ quorom/weekly/              people.py (1-3) · coverage.py (4) ·
 quorom/cli.py               quorom init · resolve-fields · import · weekly
 ```
 
-Sources are named per step: **DB** = the product database in the customer's
-environment (schema in `migrations/`), **SF** = Salesforce, **HS** = HubSpot,
-**Gong** = the call source, via the importer that fills DB.
+Sources are named per step: **DB** = your own Postgres (schema in
+`migrations/`), **SF** = Salesforce, **HS** = HubSpot, **Gong** = the call
+source, via the importer that fills DB.
 
 ---
 
@@ -368,10 +368,10 @@ may create databases on; without it the database tests skip rather than fail.
 
 ## Where it runs
 
-Inside the customer's environment. Salesforce and HubSpot are typically
-unreachable from an agent session — an egress proxy refuses CONNECT, and no
-token changes that. The product database is reachable from wherever the pipeline
-runs, which is the same environment.
+Inside your own environment. Salesforce and HubSpot are typically unreachable
+from an agent session — an egress proxy refuses CONNECT, and no token changes
+that. Your database is reachable from wherever the pipeline runs, which is the
+same environment.
 
 Testing by hand uses a pasted Salesforce token that expires in ~2 hours
 (`docs/salesforce-access.md` runbook). A deployed run uses the client-credentials

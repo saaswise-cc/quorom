@@ -1,11 +1,10 @@
-"""The product database in the customer's environment.
+"""Your Postgres database — the one holding the meeting and attendee data.
 
 Every query the artifact makes against it lives here. Schema: migrations/.
 
-The SQL is carried over unchanged from the M2 spike apart from one thing: v0
-stored `domain_kind` and `provider` as Postgres enums, so every read cast
-`::text` to compare them. migrations/0001_core.sql uses text with a CHECK
-constraint, so the casts are gone.
+`domain_kind` and `provider` are stored as text with a CHECK constraint rather
+than as Postgres enums (see migrations/0001_core.sql), which is why no read
+below casts `::text` to compare them.
 """
 
 from __future__ import annotations
@@ -118,7 +117,7 @@ def met_history(
 # seniority terms behind the senior CRM bench on tab 4.
 #
 # Read from the same connection as the meeting data, which is what makes moving
-# a deployment into a customer's environment a connection-string change.
+# a deployment to a different database a connection-string change.
 
 FOCUS_PROFILE_SQL = """
 select ufp.profile_data

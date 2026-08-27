@@ -1,13 +1,13 @@
 # Salesforce access
 
-Two ways in. The pilot pastes a short-lived token; a deployed run uses client
-credentials. **The code prefers a pasted token whenever it finds one**, so a
+Two ways in. Trying it out by hand means pasting a short-lived token; a deployed
+run uses client credentials. **The code prefers a pasted token whenever it finds one**, so a
 leftover `SF_ACCESS_TOKEN` silently keeps the two-hour path in use even after the
 client-credentials variables are set.
 
 | Mode | Variables | Use |
 |---|---|---|
-| Pasted token | `SF_ACCESS_TOKEN` + `SF_INSTANCE_URL` | Testing and the pilot. Expires in ~2 hours. |
+| Pasted token | `SF_ACCESS_TOKEN` + `SF_INSTANCE_URL` | Testing, and trying it out by hand. Expires in ~2 hours. |
 | Client credentials | `SF_TOKEN_URL` + `SF_CLIENT_ID` + `SF_CLIENT_SECRET` | Unattended runs. No paste, no refresh. Leave `SF_ACCESS_TOKEN` empty. |
 
 ## Token runbook

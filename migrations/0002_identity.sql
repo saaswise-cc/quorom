@@ -11,23 +11,22 @@
 --   artifact as a wrong 'Recent contact?' value, silently. person_identifiers
 --   is what collapses the aliases back to one person.
 --
---   It is not hypothetical at real scale: on one org 2,884 people carry 2,196
---   identifiers and 5,075 attendee links (measured in v0).
+--   It is not hypothetical at real scale: on one real org, 2,884 people carry
+--   2,196 identifiers and 5,075 attendee links.
 --
 -- The honest statement of the debt: MET_HISTORY_SQL does not use these tables
 -- yet — it still groups by email. Making the history query resolve through
 -- person_identifiers is the read path that retires this exception, and until
 -- that happens these tables are carried, not consumed.
 --
--- Provenance: v0 `20260330000000_core_schema.sql` + `20260330000002_person_identifiers.sql`
--- (shape), `src/lib/shared/deduplicate-attendees.ts` (write surface — the only
--- code that touches all three).
+-- The write surface is quorom/gong/identity.py — the only code that touches
+-- all three tables.
 
 create table people (
   id         uuid primary key default gen_random_uuid(),
   account_id uuid not null references accounts(id) on delete cascade,
 
-  -- Written by deduplicate-attendees. Null for unmatched people (below), which
+  -- Written by the identity resolver. Null for unmatched people (below), which
   -- the unique constraint permits — Postgres treats nulls as distinct.
   email      text,
   name       text,
@@ -42,13 +41,14 @@ create table people (
   unique (account_id, email)
 );
 
--- v0's `people` also carried first_name, last_name, company, title,
--- linkedin_url, company_domain and company_id. All of them were populated by
--- v0's enrichment and brief paths, which v1 does not take, and none is read by
--- the artifact — titles and LinkedIn URLs come from Salesforce at read time.
--- Left out rather than migrated: a column that arrives empty and stays empty
--- reads as coverage that does not exist. Add them in a later migration if and
--- when a read path needs them.
+-- `people` deliberately has no first_name, last_name, company, title,
+-- linkedin_url, company_domain or company_id. Columns like those only get
+-- populated by an enrichment or brief-generation path, which this pipeline
+-- does not have, and none of them is read by the artifact — titles and
+-- LinkedIn URLs come from Salesforce at read time. Left out rather than
+-- carried: a column that arrives empty and stays empty reads as coverage that
+-- does not exist. Add them in a later migration if and when a read path needs
+-- them.
 
 create table person_identifiers (
   -- Every email a person has ever been seen with, all pointing at one person

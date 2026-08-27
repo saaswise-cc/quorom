@@ -6,12 +6,13 @@ recomputing nothing. If a number here disagrees with the spreadsheet, this file
 is the one that is wrong.
 
 NOT for publishing. The page contains named contacts and email addresses from
-the customer's CRM. It is a local file to open, hand over, or attach — the rule
-about contact data staying inside the customer's environment applies to it
-exactly as it does to the workbook.
+your CRM. It is a local file to open, hand over, or attach — the rule about
+contact data staying inside your own environment applies to it exactly as it
+does to the workbook.
 
-The page title comes from the account row, never from a literal. A customer's
-name in the code is the fork this repository bans, however cosmetic.
+The page title comes from the account row, never from a literal. An
+organisation's name in the code is the fork this repository bans, however
+cosmetic.
 """
 
 from __future__ import annotations

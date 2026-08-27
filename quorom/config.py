@@ -1,9 +1,9 @@
 """Every environment value the pipeline reads, in one place.
 
-Nothing customer-specific lives in this repository. Differentiation is
+Nothing organisation-specific lives in this repository. Differentiation is
 configuration: an account row, or one of the values below. Secrets are read
-from the environment — a git-ignored .env locally, the customer environment's
-secret store in production — and are never committed.
+from the environment — a git-ignored .env locally, your own secret store in
+production — and are never committed.
 """
 
 from __future__ import annotations
@@ -47,8 +47,8 @@ def _int(name: str, default: int) -> int:
 
 @dataclass(frozen=True)
 class GongConfig:
-    """Credentials for the meeting source. v0 stored these as account columns;
-    v1 reads them from the environment (see migrations/0001_core.sql)."""
+    """Credentials for the meeting source. Read from the environment, never
+    stored as database columns (see migrations/0001_core.sql)."""
 
     access_key: str = field(default_factory=lambda: os.environ.get("GONG_ACCESS_KEY", ""))
     access_key_secret: str = field(
@@ -68,8 +68,8 @@ class SalesforceConfig:
     """Two ways in.
 
     Deployed runs use client credentials — no paste, no two-hour expiry. The
-    pasted token is the pilot shortcut and stays supported because the runbook
-    depends on it while the External Client App is not yet in place.
+    pasted token is the shortcut for trying it out by hand, and stays supported
+    because it is the only way in before an External Client App is set up.
     """
 
     access_token: str = field(default_factory=lambda: os.environ.get("SF_ACCESS_TOKEN", ""))
@@ -102,7 +102,7 @@ class HubSpotConfig:
 
 @dataclass(frozen=True)
 class Config:
-    # The product database in the customer's environment. Schema: migrations/.
+    # Your Postgres, holding the meeting and attendee data. Schema: migrations/.
     database_url: str = field(default_factory=lambda: os.environ.get("DATABASE_URL", ""))
     # Matches accounts.name. One account per deployment; the column exists so the
     # same queries ship everywhere.
