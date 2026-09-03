@@ -69,18 +69,91 @@ Four things. The first three take minutes; the fourth is the rest of this guide.
 
 ## 3. Before you start
 
+### Two machines, and they are not the same question
+
+Most of the "wait, where am I supposed to be running this?" confusion in a
+setup like this comes from one place: there are two machines involved, they are
+usually different, and they get decided at different times.
+
+| | What it is | Decided |
+|---|---|---|
+| **The workstation** | Where you install from, apply the migrations from, and run the first `init`, `import` and `weekly` by hand. Your own laptop or desktop if it can reach the systems below; otherwise a jump box, a VM or a server inside your network. | Now — sections 8 to 12 |
+| **The runner** | Whatever executes the two scheduled jobs afterwards, unattended, every week without you. A server, a container, a scheduled task on your hosting platform. | Later — section 13 |
+
+Ask them separately, and in that order. Everything through section 12 happens
+on the workstation, and nothing before section 13 requires you to have picked a
+runner. They can turn out to be the same machine; do not assume it.
+
+### What both of them have to reach
+
+The pipeline talks to three outside systems and needs a network path to all
+three:
+
+- your **PostgreSQL database** — frequently private to your own network or to
+  your hosting platform's,
+- **`api.gong.io`**, over HTTPS,
+- your **CRM** — your Salesforce org, plus HubSpot if you use one.
+
+That is what decides which machine the workstation can be. A public API like
+Gong is reachable from almost anywhere. A private Postgres and a Salesforce org
+behind your company's login usually are not, and typically want a machine
+inside your own network. A sandboxed environment in particular — the container
+an agentic coding tool runs commands in, a hosted notebook, a cloud shell you
+did not configure yourself — will often reach `api.gong.io` perfectly well and
+fail on the other two, and it fails as a connection timeout rather than as
+anything that says "wrong machine". Run the checks in the table below from the
+machine you actually intend to use, before you install anything on it.
+
+### How to run the commands in this guide
+
+Every `bash` block below is typed at a shell prompt on the workstation, unless
+the text says otherwise.
+
+- **The application.** On macOS that is **Terminal** — Applications → Utilities
+  → Terminal, or ⌘-Space and type "Terminal". This guide has been walked
+  end to end on macOS only; other platforms are untested here.
+- **The directory.** If you have no convention of your own, use **`~/quorom`**
+  — a folder named `quorom` in your home directory. Section 8 creates it by
+  cloning into it, and every command after that assumes you are inside it.
+  `cd ~/quorom` gets you back there in a new terminal.
+- **Angle brackets are deleted, not typed.** Where a command or a template
+  contains something like `<paste the connection string here>` or
+  `<YOUR REPO URL>`, replace the whole thing — brackets and all — with your own
+  value. Nothing catches you if you don't: the shell will cheerfully set a
+  variable to the literal words `<paste the connection string here>`, report no
+  error, and let you discover it several steps later as a connection failure
+  that looks like a bad password.
+- **An exported variable dies with the terminal window.** `export FOO=…` lasts
+  for that one tab. Close it, open a second one, or restart the machine, and it
+  is gone — and the commands that needed it fail in ways that never mention it.
+  Section 8 says what to do about the one this guide leans on.
+
+### What you need in hand
+
 Everything below is needed. Get them in hand first; discovering a missing one
-halfway through step 7 costs more than checking now.
+halfway through step 7 costs more than checking now. Run the checks from the
+workstation.
 
 | You need | Why | How to check |
 |---|---|---|
-| **PostgreSQL 13 or later**, that the machine running the pipeline can reach | The product database. `gen_random_uuid()` is built in from 13. | `psql "$DATABASE_URL" -c "select version();"` |
-| **Python 3.11 or later** on that machine | The pipeline is Python. | `python3 --version` |
-| **`psql`** on whichever machine applies the migrations | Four SQL files to run | `psql --version` |
-| **Gong API credentials** — an access key and secret | The meeting source. Everything downstream reads meetings imported from here. | Gong admin → API |
-| **Outbound network to `api.gong.io`** from the machine that will run the import | The overnight job needs it too, not just your laptop | `curl -sI https://api.gong.io` |
+| **PostgreSQL 13 or later**, reachable from both machines | The product database. `gen_random_uuid()` is built in from 13. | `psql "<your connection string>" -c "select version();"` |
+| **Python 3.11 or later** on the workstation | The pipeline is Python. | `python3 --version` |
+| **`psql`** on the workstation | Four SQL files to run | `psql --version` |
+| **Gong API credentials** — an access key and secret, **read-only** | The meeting source. Everything downstream reads meetings imported from here. | Gong admin → API |
+| **Outbound network to `api.gong.io`** from both machines | The overnight job needs it too, not just your workstation | `curl -sI https://api.gong.io` |
 | **Salesforce access** — see section 7 | The CRM half of the map: reconciliation, firmographics, the senior contact bench | |
 | **A HubSpot private-app key** *(optional)* | Marketing contacts. Absent, those columns read "not checked" rather than "no". | |
+
+**What the Gong key needs, and what it must not have.** Read-only, covering
+**Calls** — including attendee data, which is the half the whole stakeholder
+map is built from — and **Users**. No write scopes: the pipeline never writes
+anything back to Gong, so a key that could is a liability with no upside.
+
+> **The Access Key Secret is shown once.** Gong displays it at the moment of
+> creation and cannot show it to you again afterwards. There is no "reveal"
+> later — if you lose it, you issue a new key. Put it straight into your secret
+> store as you create it, not into a note, a message or a chat window
+> (section 4).
 
 **Salesforce is effectively required**, though the pipeline runs without it. The
 stakeholder list is built entirely from Salesforce contacts, so without it you
@@ -126,6 +199,8 @@ House rules for this project:
 - Prefer measuring to reasoning — go and get the number.
 - Never present a guess as a fact. Gaps are output, not failure.
 - Do not add columns, scores or features that were not asked for.
+- Never put a credential in this project or in a conversation. Name where a
+  secret lives; never its value.
 ```
 
 > **`<YOUR REPO URL>` does not exist yet, and that is fine.** You create that
@@ -151,6 +226,35 @@ same drift, same silence, same dead end. The project *references* the
 repository; it never *contains* it. When you need the current text of a file,
 have the agent read it at the URL.
 
+### Secrets do not go into the conversation
+
+You are about to be handed credentials — a database connection string, a Gong
+Access Key Secret, a Salesforce client secret, perhaps a HubSpot key. This is
+the rule for all of them, and it is here rather than further down because by
+section 7 it would already be too late.
+
+- **Never paste a secret into the chat.** Not a connection string, not a token,
+  not a client secret, not an API key, not "just so you can check the format".
+  A conversation is stored and searchable; it is not a secret store.
+- **Run the commands that touch a credential yourself**, in your own terminal,
+  and report back the result rather than the input: "connected", "eight
+  tables", "401 on the second call". The agent needs the outcome. It never
+  needs the value.
+- **A secret shown once goes straight to your secret store** — not into a note,
+  not into a message you intend to delete later. Gong's Access Key Secret is
+  the case that bites (section 3): displayed at creation, never again.
+- **Project instructions and tracker issues name where a secret lives, never
+  what it is.** "Database credentials: our secret store, key
+  `QUOROM_DATABASE_URL`" is the right shape. Those texts are permanent and
+  visible to everyone in the workspace, which is exactly what a credential
+  must not be.
+- **If one does land somewhere it shouldn't, rotate it.** Deleting the message
+  is not a rotation.
+
+The same care applies to output, not just input: a traceback or a log line can
+carry a connection string inside it. Read what you are about to paste. Section
+15 has the case that catches people — a failing test that builds a real config.
+
 ### Reading it and running it are different things
 
 The guide asks you to do both, and they are easy to conflate. They need
@@ -159,7 +263,7 @@ completely different things:
 | Activity | What it needs |
 |---|---|
 | **Reading** — how does this behave, what does that flag do, what does `0002` create, why is it shaped this way | The URL. Nothing else. No clone, no credentials, no database. |
-| **Executing** — applying the migrations, `quorom init`, `quorom import`, `quorom weekly` | A clone on a machine that can reach your database, Gong and Salesforce. That is step 5, in section 8. |
+| **Executing** — applying the migrations, `quorom init`, `quorom import`, `quorom weekly` | A clone on the workstation of section 3 — a machine that can reach your database, Gong and Salesforce. That is step 5, in section 8. |
 
 Asking an agent what `RECENT_DAYS` does, or what a column on tab 3 means, needs
 nothing but the address — no setup, no access, and you can do it right now.
@@ -224,9 +328,60 @@ Two ways in.
 | **Client credentials** | `SF_TOKEN_URL`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET` | The deployed run. No paste, no expiry. This is what a scheduled job needs. |
 | **Pasted token** | `SF_ACCESS_TOKEN`, `SF_INSTANCE_URL` | Trying it out by hand. Expires in about two hours. |
 
-Client credentials come from a Connected App (or External Client App) that a
-Salesforce admin at your company creates. Until that exists there is no
-unattended weekly run.
+Client credentials come from an app that a Salesforce admin at your company
+creates. Until that exists there is no unattended weekly run.
+
+### What to ask your Salesforce admin for
+
+Ask for it as one request, because it is one:
+
+- **An External Client App** in your Salesforce org, with the **client
+  credentials flow** enabled.
+- **A dedicated run-as user** for that app — an integration user that exists
+  for this and nothing else.
+- **Read and describe permission on `Account` and `Contact`** for that user,
+  and nothing beyond it. No managed package. No write access. No other object.
+
+That is the entire ask. `SF_CLIENT_ID` and `SF_CLIENT_SECRET` come from the
+app; `SF_TOKEN_URL` is your org's OAuth token endpoint.
+
+**The run-as user should not be a person.** Pointing it at somebody's own login
+works for testing and will break the schedule. The first time that person
+changes their password, loses a permission, has MFA enforced on them or leaves
+the company, the weekly run stops — at 3am, attributed to nobody, looking from
+the outside like a Salesforce outage. A dedicated integration user is the
+difference between a schedule that keeps running and one that quietly stopped
+in March.
+
+#### Finding it in the Salesforce UI
+
+> *As observed on a Salesforce org, August 2026.* Salesforce moves this
+> interface, and a confidently wrong instruction is worse than none: if what is
+> on your screen does not match what is below, trust the screen.
+
+**"Connected App" and "External Client App" are not two names for one thing.**
+External Client Apps are the current mechanism. On a current org, Setup → App
+Manager offers **New External Client App** and there is no "New Connected App"
+button at all. Older orgs may still show Connected Apps, and an existing
+Connected App keeps working — but if you are creating one today you are
+creating an External Client App, and any instructions written for Connected
+Apps will not match what you see.
+
+Three things inside that flow cost real navigation time:
+
+1. **The configuration is split across tabs.** Once the app exists, its
+   settings are not one page: **Settings** and **Policies** are separate tabs
+   and you need both.
+2. **"Enable Client Credentials Flow" appears twice, and only the second one
+   counts.** There is a checkbox by that name in the app creation form, under
+   the OAuth settings — and another by the same name on the **Policies** tab
+   afterwards. Ticking the first does not tick the second. **Only the one on
+   Policies activates the flow.** Nothing on screen signals this: the app looks
+   configured, and the token request fails.
+3. **Run As User is inside a collapsed subsection.** On the Policies tab it
+   sits under **OAuth Policies**, which is collapsed by default — not at the
+   top level of the page. Expand it and set the user. The flow does not work
+   without it.
 
 > **The one that catches people.** The code prefers a pasted token whenever it
 > finds one. A stale `SF_ACCESS_TOKEN` left in your environment silently keeps
@@ -236,22 +391,29 @@ unattended weekly run.
 
 The pasted-token runbook is in `docs/salesforce-access.md`.
 
-No managed package is required, and no permission beyond read access to
-`Account` and `Contact` plus the ability to describe both objects.
-
 ---
 
 ## 8. Step 5 — The code and the database
 
-On the machine that will run the pipeline:
+**This is workstation work.** Everything in this section runs in a terminal on
+the machine from section 3 — the one with network reach to your database,
+`api.gong.io` and Salesforce. The runner that executes the schedule is a
+separate decision and comes later, in section 13; you do not need to have
+chosen it yet, and nothing here depends on it.
 
 ```bash
-git clone https://github.com/saaswise-cc/quorom.git
-cd quorom
+cd ~
+git clone https://github.com/saaswise-cc/quorom.git quorom
+cd ~/quorom
 python3.12 -m venv .venv && source .venv/bin/activate   # any 3.11+ will do
 python -m pip install --upgrade pip
 pip install -e '.[dev]'
 ```
+
+`~/quorom` is the default this guide uses; substitute your own location if you
+have one, and read `~/quorom` as "wherever you cloned it" from here on. Note
+that `source .venv/bin/activate`, like an `export`, applies to that terminal
+window only — a new tab needs it again before `quorom` is on the path.
 
 **Name the interpreter, and upgrade pip inside the venv.** Both lines are load-
 bearing on a stock Mac. `python3` there is 3.9 — section 3 had you check exactly
@@ -275,7 +437,110 @@ That gives you the `quorom` command. Check it:
 quorom --help
 ```
 
-Create an empty database and apply the four migrations, **in filename order**:
+### Create the database
+
+The pipeline wants a database of its own. Making one is two moves: get an admin
+connection to your PostgreSQL instance, then `CREATE DATABASE`.
+
+**Find the admin connection string, and tell it apart from an app-scoped one.**
+A platform that manages Postgres for you typically shows several connection
+strings for the same instance, and they are not interchangeable. Two
+distinctions matter:
+
+- **Internal versus public hostname.** Hosting platforms usually offer an
+  internal or private hostname that only resolves inside their own network,
+  alongside a public or external one. From your workstation the internal one
+  does not resolve at all. Use the public one here.
+- **Admin versus app-scoped credential.** A string scoped to one existing
+  database, often with a user of its own, is not the same as the admin or
+  superuser credential for the whole instance. Creating a database needs the
+  second.
+
+Then create it:
+
+```bash
+export ADMIN_DATABASE_URL="<paste the admin connection string here>"
+psql "$ADMIN_DATABASE_URL" -c "CREATE DATABASE quorom;"
+```
+
+Delete the angle brackets along with the words inside them (section 3). Run
+verbatim, that `export` succeeds, silently sets the variable to the literal
+text, and hands you a failure one command later that looks like a broken
+database rather than an untouched placeholder.
+
+> **`permission denied to create database`.** This is the common case, not an
+> edge case. A connection string handed to you for an existing database
+> normally belongs to that database's own user, and that user has no
+> cluster-wide right to create databases — there is nothing you can type from
+> that connection that fixes it. You need either a superuser credential for the
+> instance, or whoever administers it to run the `CREATE DATABASE` and hand
+> back a connection string scoped to the new one.
+
+**Why it wants a database to itself.** The four migrations create eight tables
+under plain, generic names: `accounts`, `meetings`, `attendees`, `people`,
+`person_identifiers`, `person_attendees`, `user_focus_profiles`,
+`crm_field_maps`. Point them at a database your business already uses and at
+least one of those names is likely already taken. Nothing gets destroyed —
+`CREATE TABLE` refuses rather than overwrites — but the migration stops
+partway, leaving a half-applied schema and an error whose cause is invisible
+unless you already knew which eight names to watch for.
+
+Now set the connection string the rest of this guide uses. This one is
+app-scoped: it names the new database, not the instance.
+
+```bash
+export DATABASE_URL="postgresql://user:password@host:5432/quorom"
+```
+
+> **This lasts until you close the terminal.** Every step below reads
+> `DATABASE_URL` — the migrations, `quorom init`, `import`, `weekly`. Open a
+> fresh tab tomorrow and it is simply not set, and `psql` quietly falls back to
+> a local Unix socket:
+> `could not connect to server: No such file or directory ... /tmp/.s.PGSQL.5432`.
+> That error names a socket path and never mentions the variable, which sends
+> you off to check your database when the problem is your shell. Two ways not
+> to lose an afternoon to it: re-run the `export` (and
+> `source .venv/bin/activate`) in every new terminal, or put the value in the
+> `.env` file of section 9, which `quorom` reads on every run. `psql` does not
+> read `.env`, so the migrations below need the export either way.
+
+### If you must share a database: a dedicated schema
+
+A dedicated database is the recommendation, and what the rest of this guide
+assumes. If your organisation's convention is one database with a schema per
+application, that works too, with no code change: the pipeline emits
+unqualified table names, so it uses whatever schema the search path resolves
+to.
+
+```sql
+CREATE SCHEMA quorom;
+```
+
+**Set the search path on the connecting role — never as a connection-string
+parameter.** This is the important half, and the reason this is the alternative
+rather than the recommendation:
+
+```sql
+ALTER ROLE quorom_app SET search_path = quorom;
+```
+
+A search path passed in the connection string (`options=-csearch_path=…` and
+its variants) fails *silently* when it is absent, misspelled or stripped — and
+connection poolers do strip it. The connection still succeeds. The queries
+still run. They just run against the default schema, creating or reading the
+wrong tables, and nothing anywhere distinguishes that from working. Set on the
+role, the path is a property of the credential and travels with every
+connection it makes.
+
+Confirm it on the connection you are actually going to use, before you migrate:
+
+```bash
+psql "$DATABASE_URL" -c "show search_path;"
+```
+
+### Apply the migrations
+
+**In filename order:**
 
 ```bash
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0001_core.sql
@@ -560,8 +825,12 @@ and then never done.
 | A column reads `not available in this CRM` | The field map resolved nothing for it. Expected, not a failure. `quorom resolve-fields` after your admin adds a field. |
 | The employee-count or LinkedIn field looks like it picked the wrong one | Re-read the field-map block from `init`, or run `quorom resolve-fields`, which prints every candidate with its populated percentage and every rejection with the rule that rejected it. Counting tells you which field has data, not which field means what you want. |
 
-**Never print a credential.** A failing test that constructs a real config will
-load your environment. Build test clients from stubs.
+**Never print a credential** — and never paste one into a conversation with an
+agent. The full rule is in section 4, which is where you should already have
+read it. The trap specific to this section: a failing test that constructs a
+real config will load your environment, so a traceback can carry a live secret
+in it. Build test clients from stubs, and read a traceback before you paste it
+anywhere.
 
 ---
 
