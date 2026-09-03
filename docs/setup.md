@@ -142,7 +142,7 @@ workstation.
 | **Gong API credentials** — an access key and secret, **read-only** | The meeting source. Everything downstream reads meetings imported from here. | Gong admin → API |
 | **Outbound network to `api.gong.io`** from both machines | The overnight job needs it too, not just your workstation | `curl -sI https://api.gong.io` |
 | **Salesforce access** — see section 7 | The CRM half of the map: reconciliation, firmographics, the senior contact bench | |
-| **A HubSpot private-app key** *(optional)* | Marketing contacts. Absent, those columns read "not checked" rather than "no". | |
+| **A HubSpot private-app key** *(optional)* | Marketing contacts. Absent, the HubSpot columns are left out of the output entirely rather than reported as "no" or as a contact count of 0. | |
 
 **What the Gong key needs, and what it must not have.** Read-only, covering
 **Calls** — including attendee data, which is the half the whole stakeholder

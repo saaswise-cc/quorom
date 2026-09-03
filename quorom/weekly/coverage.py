@@ -132,9 +132,14 @@ def build_coverage(
                 "is_target": bool(ok and not customer),
                 "is_customer": customer,
                 "met": len(companies[domain]["people"]),
-                "sf_total": stats.get("sf_total", 0),
-                "sf_senior": stats.get("sf_senior", 0),
-                "hs_total": hs.count_domain(domain),
+                # None, not 0, when the provider was never queried. A bare 0
+                # in a count column is a measurement that was never taken, and
+                # it reads identically to a company with genuinely no contacts.
+                # The workbook drops the column entirely; the JSON dump carries
+                # the null so the same distinction survives into the inputs.
+                "sf_total": stats.get("sf_total", 0) if sf.configured else None,
+                "sf_senior": stats.get("sf_senior", 0) if sf.configured else None,
+                "hs_total": hs.count_domain(domain) if hs.configured else None,
             }
         )
 

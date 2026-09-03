@@ -221,7 +221,10 @@ the JSON dump. `linkedin` is three-valued — a URL, `""` for nothing on file, a
 
 **Read path served:**
 - tab 1 — `Title (SF)`, `LinkedIn?`, `Mobile in CRM?`, `Flag`
-- tab 2 — `In HubSpot?`, `In Salesforce?`, and which rows appear there at all
+- tab 2 — `In HubSpot?`, `In Salesforce?`, and which rows appear there at all.
+  One column per CRM that was actually configured: an unqueried CRM is not a
+  column of "not checked", it is not a column. Both are kept when both are on,
+  because "in HubSpot but not Salesforce" is the answer the tab exists for.
 
 Salesforce is the source of truth for `Title`; HubSpot is the fallback and the
 disagreement between them is itself a flag (`title differs`, `title only in …`).
@@ -245,7 +248,9 @@ count and one `AccountId`; SF `Account` firmographics — the standard
 **Read path served:** every column of **tab 3 (Company coverage)** —
 `Company name`, `Employees`, `HQ`, `Account type`, `Meets profile?`,
 `Met this wk`, `SF contacts`, `SF focus-senior`, `HubSpot contacts` — and the
-ICP filter that decides which companies reach tab 4.
+ICP filter that decides which companies reach tab 4. The three count columns
+appear only for a CRM that was configured: a count of contacts nobody counted
+is a 0 that reads exactly like a company with none on file.
 
 `Meets profile?` is the employee band and HQ geography from the focus profile.
 **A run without an active profile stops here — before step 1, in fact.** An
@@ -360,8 +365,8 @@ else.
 **What the tests cover, and what they cannot.** `pytest` runs the importer and
 the whole weekly sequence against a real Postgres with the real migrations and
 a stubbed Gong, with **Salesforce and HubSpot deliberately unconfigured** —
-which is how the "not checked" path stays honest rather than degrading into
-"NO". The CRM legs are typically unreachable from an agent session and have to be
+which is how the unconfigured-provider path stays honest rather than
+degrading into "NO" or into a count of 0. The CRM legs are typically unreachable from an agent session and have to be
 verified on a machine that can reach them, by diffing a workbook against a
 known-good run for the same week. Point `QUOROM_TEST_DSN` at a Postgres a test
 may create databases on; without it the database tests skip rather than fail.

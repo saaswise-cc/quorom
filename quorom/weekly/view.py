@@ -45,7 +45,11 @@ a{color:inherit;text-decoration:none;border-bottom:1px dotted #999}
 SECTIONS = [
     ("3 - Company coverage", "Company coverage"),
     ("4 - Stakeholder list", "Stakeholder list"),
-    ("2 - Missing from CRM", "Not in HubSpot or Salesforce"),
+    # "Not in CRM", not "Not in HubSpot or Salesforce": the heading must not
+    # name a system this run never called, and the sheet it renames is already
+    # correctly titled. A vendor name in customer-facing output is the same
+    # defect as a vendor field name in a query.
+    ("2 - Missing from CRM", "Not in CRM"),
     ("1 - Met this week", "Met this week"),
 ]
 

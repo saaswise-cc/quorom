@@ -40,6 +40,22 @@ def _linkedin_cell(value) -> str:
     return "yes" if value else ""
 
 
+def _crms_queried(cfg: Config) -> list[str]:
+    """The CRMs this run actually called, in column order.
+
+    Headers and the Source column are both built from this list, so a system
+    that was never queried cannot appear in either. The names are the vendors'
+    own, which is fine in a value that reports provenance — what is not fine is
+    naming one that was not consulted.
+    """
+    names = []
+    if cfg.hubspot.configured:
+        names.append("hubspot")
+    if cfg.salesforce.configured:
+        names.append("salesforce")
+    return names
+
+
 def build_workbook(
     cfg: Config,
     reconciled: list[dict],
@@ -71,24 +87,39 @@ def build_workbook(
         )
 
     # Tab 2 — Missing from CRM
+    #
+    # A CRM that was not configured was not queried, so it gets no column at
+    # all rather than a column of "not checked". Both are kept when both are
+    # configured: which of the two holds the person is the point of this tab —
+    # "in HubSpot but not Salesforce" is actionable, and a single merged
+    # "In CRM?" would throw that away for anyone running both.
+    hs_on = cfg.hubspot.configured
+    sf_on = cfg.salesforce.configured
+    source = "/".join(_crms_queried(cfg))
     ws2 = _sheet(
         wb,
         "2 - Missing from CRM",
-        ["Name", "Email", "Company (domain)", "In HubSpot?", "In Salesforce?", "Flag", "Source"],
+        ["Name", "Email", "Company (domain)"]
+        + (["In HubSpot?"] if hs_on else [])
+        + (["In Salesforce?"] if sf_on else [])
+        + ["Flag", "Source"],
     )
     for r in reconciled:
         in_sf = r.get("in_salesforce")
         in_hs = r.get("in_hubspot")
-        sf_cell = "not checked" if in_sf is None else ("yes" if in_sf else "NO")
-        hs_cell = "not checked" if in_hs is None else ("yes" if in_hs else "NO")
+        # None is "not checked", and only ever arises for a CRM that is
+        # unconfigured — whose column is not rendered. So a rendered cell is
+        # always a real yes/no, and "not checked" never reaches this tab.
         if in_hs is False or in_sf is False:
             flag = r.get("flag", "")
             # "needs name/title" is redundant in a gap report — the row IS the gap.
             flag = flag if "shared inbox" in flag else ""
-            ws2.append(
-                [r.get("attendee_name"), r.get("email", ""), r.get("domain"),
-                 hs_cell, sf_cell, flag, "hubspot/sfdc"]
-            )
+            row = [r.get("attendee_name"), r.get("email", ""), r.get("domain")]
+            if hs_on:
+                row.append("yes" if in_hs else "NO")
+            if sf_on:
+                row.append("yes" if in_sf else "NO")
+            ws2.append(row + [flag, source])
     if suppressed:
         ws2.append([])
         ws2.append(
@@ -99,21 +130,30 @@ def build_workbook(
         )
 
     # Tab 3 — Company coverage (triage)
+    #
+    # Same rule as tab 2, applied to counts: a provider that was not queried
+    # contributes no column. A count column has to stay numeric to be sortable
+    # and summable — writing "not checked" into it would turn the whole column
+    # to text and quietly break sorting on the tab whose job is triage — so the
+    # absence is expressed by dropping the column rather than by a value in it.
     ws3 = _sheet(
         wb,
         "3 - Company coverage",
         ["Company", "Company name", "Employees", "HQ", "Account type",
-         "Meets profile?", "Met this wk", "SF contacts", "SF focus-senior",
-         "HubSpot contacts"],
+         "Meets profile?", "Met this wk"]
+        + (["SF contacts", "SF focus-senior"] if sf_on else [])
+        + (["HubSpot contacts"] if hs_on else []),
     )
     for c in sorted(coverage, key=lambda x: (not x.get("is_target"), -x.get("met", 0))):
-        ws3.append(
-            [
-                c["domain"], c.get("name", ""), c.get("employees", ""), c.get("hq", ""),
-                c.get("account_type", "") or "(blank)", c.get("meets", ""), c.get("met", 0),
-                c.get("sf_total", 0), c.get("sf_senior", 0), c.get("hs_total", 0),
-            ]
-        )
+        row = [
+            c["domain"], c.get("name", ""), c.get("employees", ""), c.get("hq", ""),
+            c.get("account_type", "") or "(blank)", c.get("meets", ""), c.get("met", 0),
+        ]
+        if sf_on:
+            row += [c.get("sf_total", 0), c.get("sf_senior", 0)]
+        if hs_on:
+            row.append(c.get("hs_total", 0))
+        ws3.append(row)
     ws3.append([])
     ws3.append(
         [

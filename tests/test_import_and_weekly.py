@@ -38,6 +38,20 @@ def _cfg(dsn: str, tmp_path, **overrides) -> Config:
     return Config(**kwargs)
 
 
+def _seed_profile(dsn: str, account_id: str) -> None:
+    """An active focus profile — run_weekly refuses to start without one."""
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        conn.execute(
+            "insert into user_focus_profiles (account_id, version_number, is_active, "
+            "profile_data) values (%s, 1, true, %s)",
+            (account_id, json.dumps({
+                "employee_count_min": 200, "employee_count_max": 10000,
+                "hq_geographies": ["North America"],
+                "focus_seniority": ["c-level", "vp", "director"],
+            })),
+        )
+
+
 def _import(dsn: str, account_id: str, gong_calls, database_conn=None):
     from tests.conftest import FakeGong
 
@@ -126,16 +140,7 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     account_id = _seed_account(database)
     _import(database, account_id, gong_calls)
 
-    with psycopg.connect(database, autocommit=True) as conn:
-        conn.execute(
-            "insert into user_focus_profiles (account_id, version_number, is_active, "
-            "profile_data) values (%s, 1, true, %s)",
-            (account_id, json.dumps({
-                "employee_count_min": 200, "employee_count_max": 10000,
-                "hq_geographies": ["North America"],
-                "focus_seniority": ["c-level", "vp", "director"],
-            })),
-        )
+    _seed_profile(database, account_id)
 
     cfg = _cfg(database, tmp_path)
     paths = run_weekly(cfg, log=lambda *_: None)
@@ -153,7 +158,9 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     met = list(wb["1 - Met this week"].iter_rows(min_row=2, values_only=True))
     assert len(met) == 11
 
-    # With no CRM configured every row is "not checked" — never "NO".
+    # No CRM was queried, so nothing can be reported missing from one. The
+    # columns that would have said so are not rendered at all — see
+    # test_tabs_2_and_3_omit_a_crm_that_was_never_queried.
     missing = [
         r for r in wb["2 - Missing from CRM"].iter_rows(min_row=2, values_only=True)
         if r[0]
@@ -167,6 +174,151 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     html = open(paths["html"]).read()
     assert "northwind.com" in html     # the account, not a hardcoded name
     assert "not for publishing" in html
+
+
+def _headers(ws) -> list:
+    return [h for h in next(ws.iter_rows(max_row=1, values_only=True)) if h]
+
+
+def test_tabs_2_and_3_omit_a_crm_that_was_never_queried(database, gong_calls, tmp_path):
+    """Four output surfaces, in the state the suite actually runs in.
+
+    Nothing covered this before: the suite has always run with both CRMs off
+    and only asserted tab 1, so a heading naming two vendors, two always-present
+    columns, a hardcoded "hubspot/sfdc" provenance and a bare 0 contact count
+    all stayed invisible. An unqueried provider must contribute no column, no
+    count and no name anywhere a reader can see.
+    """
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
+    wb = load_workbook(paths["xlsx"])
+
+    # Tab 2 — neither "In HubSpot?" nor "In Salesforce?" is offered, so
+    # "not checked" never has to appear on this tab at all.
+    assert _headers(wb["2 - Missing from CRM"]) == [
+        "Name", "Email", "Company (domain)", "Flag", "Source",
+    ]
+
+    # Tab 3 — the count columns for both unqueried providers are gone. A 0
+    # here would be indistinguishable from a company with genuinely no
+    # contacts on file.
+    assert _headers(wb["3 - Company coverage"]) == [
+        "Company", "Company name", "Employees", "HQ", "Account type",
+        "Meets profile?", "Met this wk",
+    ]
+
+    # No cell on any tab reports a check that never happened.
+    for name in wb.sheetnames:
+        for row in wb[name].iter_rows(values_only=True):
+            for value in row:
+                assert "not checked" != str(value).strip().lower()
+
+    # The inputs dump carries the same distinction as null, not zero, so the
+    # JSON cannot be re-read later as "we looked and found none".
+    dump = json.loads(open(paths["json"]).read())
+    for company in dump["coverage"]:
+        assert company["hs_total"] is None
+        assert company["sf_total"] is None
+        assert company["sf_senior"] is None
+
+    # The HTML view renamed the tab to a heading naming both vendors. It is
+    # the file a reader actually opens.
+    html = open(paths["html"]).read()
+    assert "Not in CRM" in html
+    assert "Not in HubSpot or Salesforce" not in html
+    assert "hubspot" not in html.lower()
+
+
+@pytest.mark.parametrize(
+    "hs_on, sf_on, crm_columns, source",
+    [
+        (True, True, ["In HubSpot?", "In Salesforce?"], "hubspot/salesforce"),
+        (True, False, ["In HubSpot?"], "hubspot"),
+        (False, True, ["In Salesforce?"], "salesforce"),
+        (False, False, [], ""),
+    ],
+)
+def test_workbook_columns_follow_the_crms_configured(
+    tmp_path, hs_on, sf_on, crm_columns, source
+):
+    """Both columns survive when both CRMs are on — "in HubSpot but not
+    Salesforce" is the actionable answer and merging them into one "In CRM?"
+    would lose it. Only the unconfigured one is dropped, and Source names
+    exactly what was queried.
+
+    A unit test rather than an end-to-end one: configuring a CRM leg here would
+    make the run reach for the real API. The credentials below are literals, so
+    nothing real can leak into a failure message.
+    """
+    from quorom.config import HubSpotConfig, SalesforceConfig
+    from quorom.weekly.workbook import build_workbook
+
+    cfg = Config(
+        account=ACCOUNT,
+        output_dir=str(tmp_path),
+        hubspot=HubSpotConfig(api_key="test-key" if hs_on else ""),
+        salesforce=SalesforceConfig(
+            access_token="test-token" if sf_on else "",
+            instance_url="https://example.invalid" if sf_on else "",
+        ),
+    )
+    assert cfg.hubspot.configured is hs_on and cfg.salesforce.configured is sf_on
+
+    reconciled = [
+        {
+            "attendee_name": "Dana Reyes", "email": "dana@acme.com",
+            "domain": "acme.com", "flag": "", "title": "Director of RevOps",
+            "mobile_in_crm": False, "linkedin_in_crm": False,
+            # False is a real answer from a CRM that was called; None is what
+            # reconcile() writes for one that was not.
+            "in_hubspot": False if hs_on else None,
+            "in_salesforce": False if sf_on else None,
+        }
+    ]
+    coverage = [
+        {
+            "domain": "acme.com", "name": "Acme", "employees": 500, "hq": "US",
+            "account_type": "", "meets": "yes", "met": 1, "is_target": True,
+            "sf_total": 4 if sf_on else None,
+            "sf_senior": 1 if sf_on else None,
+            "hs_total": 7 if hs_on else None,
+        }
+    ]
+
+    out = str(tmp_path / "wb.xlsx")
+    build_workbook(cfg, reconciled, coverage, [], [], out)
+    wb = load_workbook(out)
+
+    ws2 = wb["2 - Missing from CRM"]
+    assert _headers(ws2) == (
+        ["Name", "Email", "Company (domain)"] + crm_columns + ["Flag", "Source"]
+    )
+
+    ws3 = wb["3 - Company coverage"]
+    assert _headers(ws3) == (
+        ["Company", "Company name", "Employees", "HQ", "Account type",
+         "Meets profile?", "Met this wk"]
+        + (["SF contacts", "SF focus-senior"] if sf_on else [])
+        + (["HubSpot contacts"] if hs_on else [])
+    )
+
+    rows = [r for r in ws2.iter_rows(min_row=2, values_only=True) if r[0]]
+    if not crm_columns:
+        # Nothing can be missing from a CRM that was never consulted.
+        assert rows == []
+        return
+
+    assert len(rows) == 1
+    # Source names every CRM queried and nothing else.
+    assert rows[0][-1] == source
+    for vendor in ("hubspot", "salesforce"):
+        if vendor not in source:
+            assert vendor not in " ".join(str(v) for v in rows[0]).lower()
+    # Every rendered CRM cell is a real answer, never "not checked".
+    assert list(rows[0][3:3 + len(crm_columns)]) == ["NO"] * len(crm_columns)
 
 
 def test_history_splits_on_a_changed_address(database, gong_calls):

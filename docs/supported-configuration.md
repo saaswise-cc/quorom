@@ -10,7 +10,7 @@ Checked against the code on 2026-08-25, after the field-map and geography work.
 |---|---|---|
 | **Meeting source** | Gong | Swappable — one importer, see below |
 | **CRM** | Salesforce, any org | Field names are resolved per org, not hardcoded |
-| **Marketing contacts** | HubSpot | Optional; absent reads "not checked" |
+| **Marketing contacts** | HubSpot | Optional; absent means no HubSpot column at all — never a "no", never a 0 |
 | **ICP: company size** | Employee band | |
 | **ICP: geography** | Region or country | North America, EMEA, APAC — no state or city level |
 | **ICP: account type** | Optional substring gate | Off by default |
