@@ -15,7 +15,7 @@ Two repositories are involved. Only one of them is yours to change.
 
 **Upstream — this repository.** All of the code. You read it. You never edit it.
 
-**Yours — a repository in your own version control.** Three things, and nothing
+**Yours — a repository in your own version control.** Four things, and nothing
 else:
 
 | Yours | What it means |
@@ -23,6 +23,7 @@ else:
 | Configuration | The values that make this deployment yours — your domains, your ICP, your tuning |
 | Secret *references* | The names of the secrets, not the secrets. Values live in your secret store. |
 | Your deployment pipeline | How the code reaches a machine, and what runs it on a schedule |
+| The record of what it produced | Every weekly run, kept. A run cannot be reproduced later — see section 14. |
 
 **Why this matters more than it looks.** The instinct on arriving at a repo you
 need to run is to fork it and start editing. A fork can take no update. Six
@@ -60,7 +61,7 @@ Four things. The first three take minutes; the fourth is the rest of this guide.
 1. **A Claude project** — where you and an agent do the setup and, afterwards,
    read the output. First, so the agent is with you for the rest.
 2. **A repository in your own version control** — config, secret references,
-   your pipeline. Per section 1.
+   your pipeline, and the record of every run. Per section 1.
 3. **A Linear project** — where the work and the open questions are tracked.
 4. **A running deployment** — a PostgreSQL database, the pipeline installed
    against it, and a schedule that runs it.
@@ -285,6 +286,7 @@ Create an empty repository in your own version control. What goes in it:
                     # names and non-secret values only, never a secret
 deploy/             # your pipeline: however the code reaches a machine
 schedule/           # your scheduled job definitions
+runs/               # every weekly run, committed — see section 14
 README.md           # what this deployment is, who owns it, where the output goes
 ```
 
@@ -306,8 +308,9 @@ Create a project for the deployment. It is where the two questions this guide
 cannot answer for you get tracked and closed:
 
 - **What runs the scheduled job** (section 13).
-- **Where the finished file lands** (section 14). This one decides whether
-  anyone reads the output at all.
+- **Where the finished file lands, and where every run is kept** (section 14).
+  The first decides whether anyone reads the output at all. The second decides
+  whether you can ever ask what changed.
 
 ---
 
@@ -797,15 +800,49 @@ sure a failure is visible to a person.
 
 ---
 
-## 14. Step 11 — Where the file lands
+## 14. Step 11 — Where the file lands, and where it is kept
 
-Decide this before you turn the schedule on, and write it down in your Linear
-project.
+Two questions, and they are not the same one. Decide both before you turn the
+schedule on, and write both down in your Linear project.
+
+### Who receives it
 
 An `.xlsx` in an output directory on a server is not a delivery. Somebody has to
 receive it — a person, a channel, a shared drive. This is the step that decides
 whether the map gets read, and it is the one most likely to be left until later
 and then never done.
+
+### Where every run is kept
+
+Delivery is not retention: a file sent to a person is not a record you can go
+back to.
+
+**A weekly run cannot be reproduced.** Your meetings, attendees and people
+accumulate in your database and re-importing is safe, so that part is always
+recoverable. The rest of the run is not. Company coverage, the ICP verdicts and
+the stakeholder list are computed against your CRM *as it stood that week*, and
+none of it is written back to the database. Re-run last week's window a month
+from now and you get the same meetings reconciled against a CRM that has since
+changed — a new map with an old date on it, not the map you produced.
+
+So a run that is not kept is gone. Keep all three files from every run: the
+`.xlsx`, the `.json` and the `.html`.
+
+Keep them somewhere private, durable, versioned, and readable by the agent
+working in your Claude project. The repository you created in step 2 (section 5) is the obvious
+home — it is already all four of those things, and committing each week gives
+you a dated history at no cost.
+
+**Not the directory you cloned this repository into.** `output/` is in the
+upstream `.gitignore` deliberately: those files hold real contact data, and that
+clone points at a public remote. The record belongs in your own repository,
+which is private.
+
+**Why bother.** One run is a snapshot, and answers who you met. A year of runs
+is a series, and answers the questions actually worth asking — who is new at
+this company, whose title changed, which coverage gap closed, which company went
+quiet. None of that can be read from a single file, and none of it can be
+recovered later from runs you did not keep.
 
 ---
 
