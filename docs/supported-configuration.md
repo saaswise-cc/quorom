@@ -55,7 +55,10 @@ this CRM"** and the run continues. Gaps are output, not failure.
 
 **Salesforce is still effectively required**, though. The stakeholder list is
 built entirely from Salesforce contacts, so without it you get the meeting
-reconciliation and the company coverage, and a stakeholder tab that is all gaps.
+reconciliation and the company coverage — with the ICP verdict on that coverage
+reading `not assessed — no CRM configured`, because the firmographics it judges
+were never fetched — and a stakeholder tab that states that rather than listing
+people.
 
 ---
 

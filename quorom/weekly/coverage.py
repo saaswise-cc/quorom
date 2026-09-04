@@ -35,8 +35,32 @@ def seniority_terms(profile: dict) -> list[str]:
     return terms or ["VP", "Vice President", "Chief", "Director", "Head of"]
 
 
-def meets_profile(profile: dict, employees, country: str) -> tuple[bool, str]:
+# The ICP verdict when the firmographics behind it were never fetched. A
+# company that was never measured has not failed the test — it has not taken
+# it. Phrased as "verdict — reason", the shape the artifact already uses for
+# recent contact ("no — none on record") and for the target column.
+NOT_ASSESSED = "not assessed — no CRM configured"
+
+
+def meets_profile(
+    profile: dict, employees, country: str, *, firmographics_fetched: bool = True
+) -> tuple[Optional[bool], str]:
     """The ICP test: employee band and HQ geography. Returns (ok, why-not).
+
+    **`ok` has three values, not two.** True and False are verdicts. None means
+    the test did not run, because the firmographics it reads were never
+    fetched — the CRM they come from is not configured.
+
+    Without that third state, an unconfigured CRM returns empty strings here
+    and every company fails on "no size": a judgement asserted about data
+    nobody looked up. It is not cosmetic, because this test is also the filter
+    feeding tab 4, so the same absence silently empties the stakeholder list —
+    the mirror image of the MissingFocusProfile failure in `weekly/run.py`,
+    where an absent profile makes the test pass everything instead.
+
+    None is the idiom the rest of the pipeline already uses for "not checked":
+    `in_salesforce`, `linkedin_in_crm` and tab 3's contact counts all use it,
+    for exactly this reason.
 
     `country` is the HQ country on its own, not the joined display string. The
     test that preceded this one substring-matched a country list against
@@ -47,6 +71,10 @@ def meets_profile(profile: dict, employees, country: str) -> tuple[bool, str]:
     profile made, and no country at all is missing CRM data. They read the same
     before this, and a reader could not tell which they were looking at.
     """
+    # First, because every reason below would otherwise be an artefact of the
+    # absence rather than a finding about the company.
+    if not firmographics_fetched:
+        return None, NOT_ASSESSED
     # An absent profile passing everything is why run_weekly refuses to start
     # without one (MissingFocusProfile). Kept as the answer for a caller that
     # has no profile to give, not as a mode the weekly run can reach.
@@ -106,9 +134,24 @@ def build_coverage(
     for domain in companies:
         stats = sf.domain_stats(domain, terms)
         firmo = sf.account_firmographics(stats.get("account_id"))
-        ok, why = meets_profile(profile, firmo.get("employees"), firmo.get("country"))
+        ok, why = meets_profile(
+            profile,
+            firmo.get("employees"),
+            firmo.get("country"),
+            firmographics_fetched=sf.configured,
+        )
+        assessed = ok is not None
         account_type = firmo.get("account_type", "")
         customer = is_customer(cfg, account_type)
+
+        if not assessed:
+            target = NOT_ASSESSED
+        elif ok and not customer:
+            target = "yes"
+        elif customer:
+            target = f"no — customer (Type: {account_type})"
+        else:
+            target = f"no — {why or 'profile'}"
 
         coverage.append(
             {
@@ -120,16 +163,14 @@ def build_coverage(
                 "meets": "yes" if ok else (why or "no"),
                 # The customer gate applies to the ICP-fit count, not only to the
                 # shortlist — otherwise the triage number overcounts fit.
-                "target": (
-                    "yes"
-                    if (ok and not customer)
-                    else (
-                        f"no — customer (Type: {account_type})"
-                        if customer
-                        else f"no — {why or 'profile'}"
-                    )
-                ),
-                "is_target": bool(ok and not customer),
+                "target": target,
+                # Three states, kept apart. `is_target` is a CONFIRMED target,
+                # so it is False both for a company that failed the test and for
+                # one the test could not run on — which is why filtering on it
+                # alone drops the second kind out of tab 4 entirely. `assessed`
+                # is what tells them apart; see stakeholders.companies_for_map.
+                "assessed": assessed,
+                "is_target": bool(ok) and not customer,
                 "is_customer": customer,
                 "met": len(companies[domain]["people"]),
                 # None, not 0, when the provider was never queried. A bare 0

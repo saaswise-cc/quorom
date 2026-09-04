@@ -140,6 +140,27 @@ def test_the_icp_test_reads_the_country_on_its_own(employees, country, expected)
     assert meets_profile(PROFILE, employees, country) == expected
 
 
+def test_the_icp_test_does_not_judge_data_it_never_fetched():
+    """The third state. Identical inputs, two different answers.
+
+    Empty firmographics because the CRM holds none is a finding about the
+    company — "no size; HQ unknown". Empty firmographics because no CRM was
+    ever called is not a finding at all, and returning False for it states a
+    verdict about data nobody looked up. Worse, this test is also the filter
+    feeding tab 4, so a False here silently empties the stakeholder map.
+    """
+    from quorom.weekly.coverage import NOT_ASSESSED
+
+    fetched = meets_profile(PROFILE, None, "")
+    never_fetched = meets_profile(PROFILE, None, "", firmographics_fetched=False)
+
+    assert fetched == (False, "no size; HQ unknown")
+    assert never_fetched == (None, NOT_ASSESSED)
+    # None is not False: a caller testing truthiness alone must not be able to
+    # read "not assessed" as "does not meet the profile".
+    assert never_fetched[0] is None
+
+
 def test_hq_unknown_is_not_the_same_answer_as_hq_outside():
     """One is missing CRM data, the other is a decision the profile made. They
     read identically before this, and the reader could not tell which."""

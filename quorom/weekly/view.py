@@ -23,6 +23,9 @@ import re
 
 from openpyxl import load_workbook
 
+from .coverage import NOT_ASSESSED
+from .stakeholders import ICP_NOT_ASSESSED
+
 # Carried over verbatim so the artifact looks the same week to week.
 CSS = """
 :root{color-scheme:light dark} body{font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:22px;max-width:1180px;margin:auto;color:#1a1a1a;background:#fff}
@@ -35,6 +38,7 @@ td{padding:4px 8px;border-bottom:1px solid #e4e4e4;vertical-align:top;max-width:
 @media(prefers-color-scheme:dark){td{border-bottom:1px solid #2a2a2a}}
 .no{color:#c0392b;font-weight:700} .fl{color:#8a6d00;background:#f7e8a0;border-radius:6px;padding:0 6px;font-size:11px}
 td.ok{background:#1e8e3e;color:#fff;font-weight:700;text-align:center} td.rej{color:#b06000;font-size:11px}
+td.na{color:#8a8a8a;font-style:italic;font-size:11px}
 a{color:inherit;text-decoration:none;border-bottom:1px dotted #999}
 """
 
@@ -59,6 +63,13 @@ def cell(col: str, value: str) -> tuple[str, str]:
     v = html.escape(value)
     if not v:
         return "", ""
+    # A test that never ran is neither a pass nor a rejection. Styling it as
+    # either — green, or the orange every other non-"yes" verdict gets — would
+    # put back in colour the conflation the value itself removes. Matched
+    # against the constants rather than a copy of the words, so the page cannot
+    # drift from the workbook.
+    if value in (NOT_ASSESSED, ICP_NOT_ASSESSED):
+        return "na", v
     if col == "Meets profile?":
         return ("ok", v) if v == "yes" else ("rej", v)
     if v in ("NO", "GAP"):

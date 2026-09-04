@@ -71,7 +71,12 @@ def build_workbook(
     ws1 = _sheet(
         wb,
         "1 - Met this week",
-        ["Name", "Email", "Title (SF)", "LinkedIn?", "Mobile in CRM?", "Flag", "Source"],
+        # "Title (CRM)", not "Title (SF)". The value already comes from either
+        # CRM — Salesforce wins, HubSpot is the fallback — so "(SF)" was
+        # imprecise even with Salesforce configured, and names a system that was
+        # never called without it. Which system holds a differing title is
+        # already stated in Flag, and the next column is "Mobile in CRM?".
+        ["Name", "Email", "Title (CRM)", "LinkedIn?", "Mobile in CRM?", "Flag", "Source"],
     )
     for r in reconciled:
         ws1.append(

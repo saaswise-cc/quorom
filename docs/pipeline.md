@@ -220,7 +220,7 @@ the JSON dump. `linkedin` is three-valued — a URL, `""` for nothing on file, a
 **Cost:** none — customer-owned data in both systems.
 
 **Read path served:**
-- tab 1 — `Title (SF)`, `LinkedIn?`, `Mobile in CRM?`, `Flag`
+- tab 1 — `Title (CRM)`, `LinkedIn?`, `Mobile in CRM?`, `Flag`
 - tab 2 — `In HubSpot?`, `In Salesforce?`, and which rows appear there at all.
   One column per CRM that was actually configured: an unqueried CRM is not a
   column of "not checked", it is not a column. Both are kept when both are on,
@@ -252,7 +252,16 @@ ICP filter that decides which companies reach tab 4. The three count columns
 appear only for a CRM that was configured: a count of contacts nobody counted
 is a 0 that reads exactly like a company with none on file.
 
-`Meets profile?` is the employee band and HQ geography from the focus profile.
+`Meets profile?` is the employee band and HQ geography from the focus profile,
+and it has **three** answers rather than two. With no CRM configured the
+firmographics it reads were never fetched, so it reports `not assessed — no CRM
+configured` instead of a verdict, and the companies stay on tab 4 as
+`— ICP not assessed: no CRM configured —` rather than dropping off it. Without
+that third state an unconfigured CRM fails every company on "no size" — a
+judgement about data nobody looked up — and because this column is also the
+filter feeding tab 4, it empties the stakeholder map while the workbook keeps
+its usual shape.
+
 **A run without an active profile stops here — before step 1, in fact.** An
 absent profile makes the ICP test pass everything, so the run would complete,
 the workbook would have its usual shape, and every company met that week would

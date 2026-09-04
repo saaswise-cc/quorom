@@ -97,6 +97,24 @@ def recent_contact(cfg: Config, history: Optional[dict], last_activity) -> str:
 
 NO_SENIOR_CONTACT = "— no senior contact in Salesforce —"
 
+# Tab 4 when the ICP test could not run at all. An empty tab reads as "no
+# targets this week", which is a finding a reader would act on; this says the
+# test never ran. Same shape as the row above, for the same reason: the reader
+# needs to see the difference between looking and finding nothing, and not
+# looking.
+ICP_NOT_ASSESSED = "— ICP not assessed: no CRM configured —"
+
+
+def companies_for_map(coverage: list[dict]) -> list[dict]:
+    """The companies tab 4 shows: confirmed targets, plus every company whose
+    ICP test could not run.
+
+    The second half is the whole point. `is_target` is False for an unassessed
+    company exactly as it is for a rejected one, so filtering on it alone drops
+    a company out of the map because data nobody fetched did not clear a bar.
+    """
+    return [c for c in coverage if c.get("is_target") or not c.get("assessed", True)]
+
 
 def build(
     cfg: Config,
@@ -108,9 +126,26 @@ def build(
     """-> (rows for tab 4, the raw bench for the JSON dump)."""
     rows: list[dict] = []
     raw: list[dict] = []
-    targets = [c for c in coverage if c.get("is_target")]
 
-    for company in sorted(targets, key=lambda x: -x.get("met", 0)):
+    for company in sorted(companies_for_map(coverage), key=lambda x: -x.get("met", 0)):
+        if not company.get("assessed", True):
+            # The ICP test never ran for this company, so there is no verdict to
+            # act on and no bench worth querying — the CRM the bench comes from
+            # is the one that is not configured. State that on the row; leaving
+            # the tab empty would read as "nobody worth considering this week".
+            rows.append(
+                {
+                    "domain": company["domain"],
+                    "company": company.get("name") or company["domain"],
+                    "name": ICP_NOT_ASSESSED,
+                    "title": "",
+                    "contact": "",
+                    "linkedin": "",
+                    "mobile": "",
+                }
+            )
+            continue
+
         bench = sf.senior_bench(company["domain"], terms)
 
         # The phone NUMBER is redacted out of the dump. Sensitive contact fields

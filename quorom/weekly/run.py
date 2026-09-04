@@ -49,13 +49,16 @@ def run_weekly(cfg: Config, log=print) -> dict:
     sf = Salesforce(cfg)
     hs = HubSpot(cfg)
     if not sf.configured:
-        log("[i] Salesforce not configured — 'In Salesforce?' will read 'not checked'.")
+        log(
+            "[i] Salesforce not configured — its columns are omitted, and the ICP "
+            "test cannot run: tab 3 will read 'not assessed' rather than a verdict."
+        )
     elif sf._cfg.uses_client_credentials:
         log("[i] Salesforce: client-credentials flow.")
     else:
         log("[i] Salesforce: pasted token (expires ~2h — see docs/salesforce-access.md).")
     if not hs.configured:
-        log("[i] HubSpot not configured — 'In HubSpot?' will read 'not checked'.")
+        log("[i] HubSpot not configured — its columns are omitted from tabs 2 and 3.")
 
     with db.connect(cfg) as conn:
         # Read first, before any work: the profile carries the ICP test and the
@@ -127,6 +130,16 @@ def run_weekly(cfg: Config, log=print) -> dict:
         log(f"[*] Account.Type values observed: {type_counts}")
 
         targets = [c for c in coverage if c["is_target"]]
+        # Not targets and not rejections: companies the ICP test could not run
+        # on at all. Counted separately, because folding them into either
+        # number is the misreport this whole path exists to prevent.
+        undetermined = [c for c in coverage if not c.get("assessed", True)]
+        if undetermined:
+            log(
+                f"[!] ICP test did not run for {len(undetermined)} of {len(coverage)} "
+                "companies — no CRM configured, so no firmographics were fetched. "
+                "They are reported as 'not assessed' on tabs 3 and 4, not dropped."
+            )
         if cfg.customer_account_types:
             fits = sum(1 for c in coverage if c["meets"] == "yes")
             gated = [c["domain"] for c in coverage if c["meets"] == "yes" and c["is_customer"]]
@@ -144,16 +157,23 @@ def run_weekly(cfg: Config, log=print) -> dict:
 
         # Step 5 — the stakeholder list
         terms = coverage_mod.seniority_terms(profile)
-        history = db.met_history(conn, cfg, [c["domain"] for c in targets])
+        # The same set tab 4 will render, so history is fetched for every company
+        # that reaches the map rather than for confirmed targets alone.
+        mapped = stakeholders_mod.companies_for_map(coverage)
+        history = db.met_history(conn, cfg, [c["domain"] for c in mapped])
         log(
             f"[*] Meeting history: {len(history)} distinct people ever met across "
-            f"{len(targets)} target companies"
+            f"{len(mapped)} companies on the map"
         )
         stakeholders, bench_raw = stakeholders_mod.build(cfg, coverage, terms, history, sf)
         gaps = workbook_mod.count_gaps(stakeholders)
+        unassessed = sum(
+            1 for r in stakeholders if r.get("name") == stakeholders_mod.ICP_NOT_ASSESSED
+        )
         log(
-            f"[*] Stakeholder list: {len(stakeholders) - gaps} people across "
-            f"{len(targets)} companies ({gaps} with no senior CRM contact)"
+            f"[*] Stakeholder list: {len(stakeholders) - gaps - unassessed} people "
+            f"across {len(targets)} target companies ({gaps} with no senior CRM "
+            f"contact" + (f", {len(undetermined)} not assessed" if unassessed else "") + ")"
         )
 
         describe = sf.describe_contact() if sf.configured else {"checked": False}

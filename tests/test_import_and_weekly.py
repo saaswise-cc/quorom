@@ -14,6 +14,7 @@ from quorom import db
 from quorom.config import Config
 from quorom.gong.importer import import_range
 from quorom.weekly.run import run_weekly
+from quorom.weekly.stakeholders import NO_SENIOR_CONTACT
 
 ACCOUNT = "northwind.com"
 
@@ -319,6 +320,90 @@ def test_workbook_columns_follow_the_crms_configured(
             assert vendor not in " ".join(str(v) for v in rows[0]).lower()
     # Every rendered CRM cell is a real answer, never "not checked".
     assert list(rows[0][3:3 + len(crm_columns)]) == ["NO"] * len(crm_columns)
+
+
+def test_the_map_filter_keeps_a_company_it_could_not_assess():
+    """The filter half. `is_target` is False for a company that failed the ICP
+    test AND for one the test could not run on, so filtering on it alone drops
+    the second kind off tab 4 — a company disappearing from the map because
+    data nobody fetched did not clear a bar."""
+    from quorom.weekly.stakeholders import companies_for_map
+
+    coverage = [
+        {"domain": "target.com", "assessed": True, "is_target": True},
+        {"domain": "rejected.com", "assessed": True, "is_target": False},
+        {"domain": "unassessed.com", "assessed": False, "is_target": False},
+    ]
+
+    kept = [c["domain"] for c in companies_for_map(coverage)]
+
+    assert kept == ["target.com", "unassessed.com"]
+    # A company the test rejected is a decision, and stays off the map.
+    assert "rejected.com" not in kept
+
+
+def test_no_crm_does_not_silently_empty_the_stakeholder_map(
+    database, gong_calls, tmp_path
+):
+    """With no CRM, the ICP test cannot run — and must say so rather than
+    reporting a verdict.
+
+    Before this, empty firmographics made every company fail on "no size", and
+    the same verdict is the filter feeding tab 4, so the map came out empty.
+    Nothing errored and the workbook had its usual shape: an empty tab 4 reads
+    as "nobody worth considering this week", which is a finding a reader would
+    act on, rather than "the test never ran".
+    """
+    from quorom.weekly.coverage import NOT_ASSESSED
+    from quorom.weekly.stakeholders import ICP_NOT_ASSESSED
+
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
+    wb = load_workbook(paths["xlsx"])
+
+    # Tab 3 — the verdict column states that no verdict was reached. Not "no
+    # size", which is a finding about the company.
+    ws3 = wb["3 - Company coverage"]
+    verdict = _headers(ws3).index("Meets profile?")
+    companies = [r for r in ws3.iter_rows(min_row=2, values_only=True) if r[1] or r[6]]
+    assert companies, "the company met this week must still appear on tab 3"
+    for row in companies:
+        assert row[verdict] == NOT_ASSESSED
+
+    # Tab 4 — not empty. Every company that reached the map is on it, saying
+    # why there are no people rather than being absent.
+    tab4 = [
+        r for r in wb["4 - Stakeholder list"].iter_rows(min_row=2, values_only=True)
+        if r[1]
+    ]
+    assert tab4, "tab 4 must not be empty when the ICP test could not run"
+    assert {r[1] for r in tab4} == {ICP_NOT_ASSESSED}
+    assert {r[0] for r in tab4} == {"acme.com"}
+    # Not the "we looked and found nobody" row — nothing was looked at.
+    assert all(r[1] != NO_SENIOR_CONTACT for r in tab4)
+
+    # Tab 1 — the header no longer names a CRM this run never called.
+    assert "Title (CRM)" in _headers(wb["1 - Met this week"])
+    assert "Title (SF)" not in _headers(wb["1 - Met this week"])
+
+    # The dump carries the third state as its own field, so "could not assess"
+    # cannot later be re-read as "assessed and rejected".
+    dump = json.loads(open(paths["json"]).read())
+    for company in dump["coverage"]:
+        assert company["assessed"] is False
+        assert company["is_target"] is False
+        assert company["meets"] == NOT_ASSESSED
+    # Nothing was queried, so no bench is claimed for it — not even an empty one.
+    assert dump["sf_bench"] == []
+
+    # The HTML must not colour a test that never ran as a rejection.
+    html = open(paths["html"]).read()
+    assert "not assessed" in html
+    assert f'class="na">{NOT_ASSESSED}' in html
+    assert f'class="rej">{NOT_ASSESSED}' not in html
 
 
 def test_history_splits_on_a_changed_address(database, gong_calls):
