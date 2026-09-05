@@ -13,7 +13,7 @@ The code lives in `quorom/` — one module per step, named for the step:
 quorom/bootstrap.py         quorom init — the account row and the focus profile
 quorom/config.py            every environment value, in one place
 quorom/geography.py         regions, countries and the HQ comparison
-quorom/db.py                the product DB and the three queries against it
+quorom/db.py                the product DB and the queries against it
 quorom/domains.py           internal / external / personal classification
 quorom/gong/                client.py · importer.py · identity.py      (step 0)
 quorom/crm/                 salesforce.py · hubspot.py                 (steps 3-5)
@@ -149,7 +149,7 @@ import succeeds. The second one, over any range that overlaps it, raises — so 
 backfill looks clean on Friday and the overnight job dies on Saturday, with
 nothing in between to suggest why.
 
-The port therefore has idempotency at three levels, all in `quorom/gong/`:
+The port therefore guards every write, all in `quorom/gong/`:
 
 | Write | Guard |
 |---|---|
@@ -160,7 +160,7 @@ The port therefore has idempotency at three levels, all in `quorom/gong/`:
 
 `tests/test_import_and_weekly.py::test_reimport_is_idempotent` runs the same
 range twice and asserts every table count is unchanged. It is there to fail if
-any of the four guards is ever removed.
+any of these guards is ever removed.
 
 ---
 

@@ -356,6 +356,59 @@ the outside like a Salesforce outage. A dedicated integration user is the
 difference between a schedule that keeps running and one that quietly stopped
 in March.
 
+#### Creating the integration user
+
+> *As observed on a Salesforce org, September 2026.* Same caveat as the section
+> below: if what is on your screen disagrees with this, trust the screen.
+
+This is the most error-prone step in the guide, and nearly all of the difficulty
+is three things with almost the same name.
+
+**The user licence.** `Salesforce Integration` is an API-only *user* licence —
+that user cannot log into the UI at all, which is exactly what you want.
+Enterprise editions and above include a small number of them at no extra cost,
+so check what you already have before assuming you need to buy one.
+
+**The profile.** `Minimum Access - API Only Integrations` is the matching
+profile. Start there and add nothing to it.
+
+**The permission set licence — a different thing with almost the same name.**
+The permission set that grants object access needs `Salesforce API Integration`,
+which is a *permission set* licence, not the user licence above. Choosing
+`--None--` lets you build the permission set successfully and then fails at
+**assignment**, with:
+
+```
+The user license doesn't allow the permission: Read Account
+```
+
+That message sends you looking at object permissions, which are fine. The cause
+is a licence field two screens back.
+
+**A permission set's licence cannot be changed after it is created.** It is not
+in Edit Properties. If you pick the wrong one, delete the permission set and
+build it again.
+
+What the permission set should grant: **Read**, **View All Records** and **View
+All Fields** on `Account` and `Contact`, and nothing else. View All Fields
+rather than ticking fields one by one, because the field map is resolved
+dynamically at setup — which fields it will read cannot be enumerated in
+advance.
+
+Four smaller things, each of which costs time:
+
+1. **The username must be globally unique across all of Salesforce, and does not
+   have to be a real address.** A suffixed form such as
+   `quorom-integration@yourcompany.com.prod` works. The *email* field is
+   separate and can be an existing monitored inbox.
+2. **Select objects by API name.** The object list is full of similar display
+   names; `Account` and `Contact` are unambiguous.
+3. **`Run As (Username)` wants the username**, not the display name the picker
+   offers you. The display name is rejected.
+4. **The assignment screen may arrive empty**, with a message about Salesforce
+   Classic. There are two list views both named "All Users", and only one of
+   them works.
+
 #### Finding it in the Salesforce UI
 
 > *As observed on a Salesforce org, August 2026.* Salesforce moves this
@@ -579,18 +632,21 @@ above:
 pytest
 ```
 
-That gives **137 passed, 21 skipped**, and the skips matter: those 21 are the
+Some of them will skip, and the skips matter more than they look: those are the
 tests that need a real PostgreSQL, and they skip silently when they cannot find
-one. A run that skips them is green on any machine with no database, which is to
-say green almost everywhere, including where something is genuinely broken. To
-run all 158, point `QUOROM_TEST_DSN` at a Postgres and run it again:
+one. A run that skips them is green on any machine with no database — which is
+to say green almost everywhere, including where something is genuinely broken.
+
+To run all of them, point `QUOROM_TEST_DSN` at a Postgres and run it again:
 
 ```bash
 export QUOROM_TEST_DSN=postgresql://postgres@localhost:5432/postgres
 pytest
 ```
 
-Expect **158 passed**. Anything else is worth stopping for.
+**Zero failed and zero skipped** is the gate. pytest prints both counts on every
+run, so you do not need a number from this guide to check it. Any failure, and
+any remaining skip, is worth stopping for.
 
 > **Not your product database.** The suite creates and drops its own databases
 > on whatever server that DSN names. Give it a scratch Postgres — a container is
@@ -852,6 +908,7 @@ recovered later from runs you did not keep.
 |---|---|
 | `[!] Missing environment: DATABASE_URL, ACCOUNT_DOMAIN` | **Check first: are they set in a `.env`, and did you install with `pip install -e .` rather than `pip install -e '.[dev]'`?** Without the extra, `python-dotenv` is absent and the whole file is ignored, so correctly-set values are reported missing. `quorom` now warns about this on stderr when a `.env` is present. Otherwise: those two are required before anything runs, and an exported shell variable beats the file. |
 | `[!] The schema is not there. Apply the migrations first` | Section 8. |
+| `bad interpreter: no such file or directory` from `quorom` or `pytest` | A virtualenv hardcodes its own absolute path, so renaming or moving the directory breaks every console script in `.venv/bin`. Delete `.venv` and rebuild it where the directory now lives. |
 | `ERROR: File "setup.py" or "setup.cfg" not found. Directory cannot be installed in editable mode` (with `(A "pyproject.toml" file was found, but editable mode currently requires a setuptools-based build.)`) | Your `pip` is too old for an editable install, which almost always means the venv was built by a too-old Python. Nothing is missing from the repository — there is deliberately no `setup.py`. `python -m pip --version` and `python -V` inside the venv; if Python is below 3.11, rebuild the venv with an explicit `python3.12 -m venv .venv`. Section 8. |
 | `[!] No account named '<x>'. Run 'quorom init' first.` | `ACCOUNT_DOMAIN` does not match any account row — either you skipped `init`, or the value changed since. |
 | `accounts.internal_domains is empty` | `init` did not run, or ran without `--internal-domains`. Every attendee would be classified external. |
