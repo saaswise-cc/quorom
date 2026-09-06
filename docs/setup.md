@@ -23,7 +23,7 @@ else:
 | Configuration | The values that make this deployment yours — your domains, your ICP, your tuning |
 | Secret *references* | The names of the secrets, not the secrets. Values live in your secret store. |
 | Your deployment pipeline | How the code reaches a machine, and what runs it on a schedule |
-| The record of what it produced | Every weekly run, kept. A run cannot be reproduced later — see section 14. |
+| The record of what it produced | Every weekly run, kept — a run cannot be reproduced later. Yours to hold; where you keep it is section 14. |
 
 **Why this matters more than it looks.** The instinct on arriving at a repo you
 need to run is to fork it and start editing. A fork can take no update. Six
@@ -885,14 +885,26 @@ So a run that is not kept is gone. Keep all three files from every run: the
 `.xlsx`, the `.json` and the `.html`.
 
 Keep them somewhere private, durable, versioned, and readable by the agent
-working in your Claude project. The repository you created in step 2 (section 5) is the obvious
-home — it is already all four of those things, and committing each week gives
-you a dated history at no cost.
+working in your Claude project. The repository you created in step 2 (section
+5) is the obvious home — it is already all four of those things, and committing
+each week gives you a dated history at no cost.
+
+**One thing to weigh before the first commit.** Git history is permanent by
+design. That is what makes it a good record, and it is also the reason to
+decide deliberately: these files carry real people's names, titles and CRM
+state, a commit cannot practically be un-made, and repository access at most
+companies is wider than the set of people who should be reading a stakeholder
+map. For most deployments that is a fair trade — it is your own private
+repository, and the same data already sits in your CRM and your database under
+access that is no narrower. If your organisation has a process for removing an
+individual's data on request, choose something you can delete from instead: a
+shared folder with restricted membership meets the same four properties, and so
+does the deployment's own database.
 
 **Not the directory you cloned this repository into.** `output/` is in the
-upstream `.gitignore` deliberately: those files hold real contact data, and that
-clone points at a public remote. The record belongs in your own repository,
-which is private.
+upstream `.gitignore` deliberately, because those files hold real contact data.
+That holds wherever they end up: the record goes somewhere you chose and
+control, never into a clone of an upstream repository.
 
 **Why bother.** One run is a snapshot, and answers who you met. A year of runs
 is a series, and answers the questions actually worth asking — who is new at
