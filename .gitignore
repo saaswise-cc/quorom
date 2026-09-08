@@ -163,3 +163,7 @@ venv/
 # The weekly run writes the workbook, the JSON dump and the HTML view here.
 # They contain real contact data and must never be committed.
 output/
+
+# Files delivered into this folder by the Claude desktop app.
+# Has held a student-data export; never commit.
+Claude outputs/

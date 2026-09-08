@@ -4,7 +4,8 @@ Read this before deploying. It states what has been built and tested, not what
 the design allows. Where something is not supported, the entry says what it
 would take — so you can judge the work rather than discover it.
 
-Checked against the code on 2026-08-25, after the field-map and geography work.
+Checked against the code on 2026-09-04, after the field-map, geography and
+ICP-test work.
 
 | | Supported | Notes |
 |---|---|---|
