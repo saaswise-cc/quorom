@@ -919,6 +919,23 @@ database credentials, because it cannot run at all without them. Keeping runs
 in the database inherits an identity that exists; keeping them in a repository
 creates one.
 
+**And that identity may not be yours to create.** Worth checking before you
+choose the repository, because it is not a question of effort. On one real
+deployment it was blocked twice over: project access tokens disabled at the
+group level — a setting owned by a platform team, not by the repository — and
+deploy tokens, the remaining option, carrying no write scope for the repository
+at all. Neither wall was visible from the repository's own settings page. The
+names differ between platforms; the shape does not. A database role you already
+hold has nothing equivalent to discover.
+
+Two smaller differences. These are binary files, the `.xlsx` especially, so a
+repository stores each week's copy whole rather than as a delta and never
+compacts it — a few megabytes a year at this size, which is not a problem, but
+it only grows. And a table can be asked questions: "which weeks do we have" is
+one line of SQL where in a repository it is a checkout. Nothing in Quorom reads
+`run_outputs` back — that SQL is yours to write, not a feature of the pipeline —
+but the option exists in one place and not the other.
+
 Three steps.
 
 **Apply migration 0005:**
@@ -966,9 +983,15 @@ run at 3am that nobody is watching.
 
 #### Option B — the repository from step 2
 
-Also valid, and less work if you would rather not write a storage step at all:
-committing three files a week gives you a dated, diffable history for free, and
-`runs/` is already in the layout section 5 suggested.
+Also valid. It keeps the record beside your deployment config rather than
+inside the pipeline's own database, `runs/` is already in the layout section 5
+suggested, and if the `.json` dumps are what you will actually compare later, a
+repository diffs those natively.
+
+**The cost is a storage step you own.** Option A is written for you — the
+pipeline stores all three files as its last step once `RETAIN_RUNS` is on. Here
+you write and schedule the commit yourself, next to whatever runs the weekly
+job, and that step needs the write identity discussed above.
 
 The thing to weigh is that **git history is permanent by design.** That is what
 makes it a good record, and it is why this should be a decision rather than a
