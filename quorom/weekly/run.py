@@ -16,6 +16,7 @@ from ..crm.hubspot import HubSpot
 from ..crm.salesforce import Salesforce
 from . import coverage as coverage_mod
 from . import people as people_mod
+from . import retention as retention_mod
 from . import stakeholders as stakeholders_mod
 from . import view as view_mod
 from . import workbook as workbook_mod
@@ -39,6 +40,17 @@ class MissingFieldMap(RuntimeError):
     come from, so a run without one reads standard fields only — no headcount
     from a package field, no HQ, no LinkedIn — and the ICP test then judges
     every company on data it did not fetch. `quorom resolve-fields` writes one.
+    """
+
+
+class MissingRunOutputsTable(RuntimeError):
+    """RETAIN_RUNS is on but run_outputs does not exist.
+
+    Fatal for the same reason: without this check, the failure surfaces on the
+    last line of the run, after every Gong and CRM call, as a raw "relation
+    run_outputs does not exist" — instead of before any of them. Apply
+    `migrations/0005_run_outputs.sql` and grant the pipeline's role INSERT and
+    SELECT on it; see `docs/setup.md` §14.
     """
 
 
@@ -98,6 +110,22 @@ def run_weekly(cfg: Config, log=print) -> dict:
         sf.fields = FieldMap(field_map)
         for line in fieldmap_mod.describe_lines(field_map):
             log(f"[i] Field map: {line}")
+
+        # Retention, checked here for the same reason as the two guards above:
+        # it is only used at the very end, after emitting the three files, so
+        # an unapplied migration would otherwise surface there — after every
+        # Gong and CRM call this run makes.
+        if cfg.retain_runs:
+            with conn.cursor() as cur:
+                cur.execute("select to_regclass('run_outputs')")
+                exists = cur.fetchone()[0]
+            if exists is None:
+                raise MissingRunOutputsTable(
+                    "RETAIN_RUNS is on but the run_outputs table does not exist. "
+                    "Apply migrations/0005_run_outputs.sql and grant the "
+                    "pipeline's role INSERT and SELECT on it — see "
+                    "docs/setup.md §14."
+                )
 
         # Step 1 — the week's external attendees
         rows = db.week_attendees(conn, cfg)
@@ -210,5 +238,13 @@ def run_weekly(cfg: Config, log=print) -> dict:
 
     html_path = view_mod.render(xlsx_path, cfg.account)
     log(f"[✓] Wrote {html_path}")
+
+    if cfg.retain_runs:
+        retention_mod.store(
+            cfg, week, {"xlsx": xlsx_path, "json": json_path, "html": html_path}
+        )
+        log(f"[✓] Retained run {week} in run_outputs (xlsx, json, html)")
+    else:
+        log("[i] RETAIN_RUNS is off — this run's files are not stored in the database.")
 
     return {"xlsx": xlsx_path, "json": json_path, "html": html_path}

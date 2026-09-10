@@ -45,6 +45,13 @@ def _int(name: str, default: int) -> int:
     return int(raw)
 
 
+def _bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True)
 class GongConfig:
     """Credentials for the meeting source. Read from the environment, never
@@ -139,6 +146,13 @@ class Config:
     )
 
     output_dir: str = field(default_factory=lambda: os.environ.get("OUTPUT_DIR", "output"))
+
+    # Off by default — a deployment that has not chosen retention must not
+    # silently start storing contact data. On, quorom/weekly/run.py stores the
+    # week's three emitted files into run_outputs (migrations/0005, applied
+    # separately — see docs/setup.md §14). Read by nothing else in the
+    # pipeline.
+    retain_runs: bool = field(default_factory=lambda: _bool("RETAIN_RUNS", False))
 
     def week_bounds(self) -> tuple[str, str]:
         """(start, end) of the target week as timestamps in the configured tz."""

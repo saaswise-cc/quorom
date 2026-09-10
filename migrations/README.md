@@ -53,8 +53,16 @@ accounts ─┬─ meetings ── attendees ── person_attendees ── peop
 Every column carries the read path that justifies it, in a comment. A column
 with no reader named should not be added.
 
+## Retention (optional)
+
+`0005_run_outputs.sql` is not part of the block above and not something every
+deployment needs to run. It adds one table, `run_outputs`, for a deployment
+that has chosen to keep every weekly run in the database — `docs/setup.md`
+§14, Option A. Apply it there, once you have made that choice, and grant the
+pipeline's own role `INSERT` and `SELECT` on it and nothing else.
+
 ## Adding one
 
-Next file is `0005_`. Migrations are append-only once a deployment has run
+Next file is `0006_`. Migrations are append-only once a deployment has run
 them — the database is yours, holds your live data, and cannot be rebuilt from
 scratch to accommodate an edit.

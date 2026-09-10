@@ -28,7 +28,12 @@ from .crm.fieldmap import FieldMapError, describe_lines, resolve
 from .crm.salesforce import Salesforce
 from .gong.client import GongClient
 from .gong.importer import import_range
-from .weekly.run import MissingFieldMap, MissingFocusProfile, run_weekly
+from .weekly.run import (
+    MissingFieldMap,
+    MissingFocusProfile,
+    MissingRunOutputsTable,
+    run_weekly,
+)
 
 
 def _require(cfg: Config) -> None:
@@ -279,7 +284,12 @@ def cmd_weekly(args, cfg: Config) -> int:
     _require(cfg)
     try:
         run_weekly(cfg)
-    except (MissingFocusProfile, MissingFieldMap, geography.GeographyError) as exc:
+    except (
+        MissingFocusProfile,
+        MissingFieldMap,
+        MissingRunOutputsTable,
+        geography.GeographyError,
+    ) as exc:
         print(f"[!] {exc}", file=sys.stderr)
         return 2
     return 0

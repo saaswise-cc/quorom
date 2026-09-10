@@ -177,6 +177,106 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     assert "not for publishing" in html
 
 
+def test_retention_off_writes_nothing(database, gong_calls, tmp_path):
+    """RETAIN_RUNS defaults off, and off must mean off: no row anywhere."""
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    cfg = _cfg(database, tmp_path)
+    assert cfg.retain_runs is False
+    run_weekly(cfg, log=lambda *_: None)
+
+    with psycopg.connect(database) as conn:
+        count = conn.execute("select count(*) from run_outputs").fetchone()[0]
+    assert count == 0
+
+
+def test_retention_on_writes_three_rows(database, gong_calls, tmp_path):
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    paths = run_weekly(_cfg(database, tmp_path, retain_runs=True), log=lambda *_: None)
+
+    with psycopg.connect(database) as conn:
+        rows = conn.execute(
+            "select file_type, run_date, content from run_outputs order by file_type"
+        ).fetchall()
+
+    assert [r[0] for r in rows] == ["html", "json", "xlsx"]
+    # Written from the run's week start, not from whenever the row landed.
+    assert all(r[1].isoformat() == "2026-08-17" for r in rows)
+
+    stored = {r[0]: bytes(r[2]) for r in rows}
+    for file_type, path in [("xlsx", paths["xlsx"]), ("json", paths["json"]),
+                             ("html", paths["html"])]:
+        with open(path, "rb") as f:
+            assert stored[file_type] == f.read()
+
+
+def test_retention_rerun_appends(database, gong_calls, tmp_path):
+    """A re-run is a second real run, not a replacement of the first."""
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    cfg = _cfg(database, tmp_path, retain_runs=True)
+    run_weekly(cfg, log=lambda *_: None)
+    run_weekly(cfg, log=lambda *_: None)
+
+    with psycopg.connect(database) as conn:
+        count = conn.execute("select count(*) from run_outputs").fetchone()[0]
+    assert count == 6
+
+
+def test_retention_partial_failure_leaves_no_rows(database, tmp_path):
+    """One good file, one missing — the transaction must not keep the good one."""
+    from quorom.weekly import retention
+
+    good_xlsx = tmp_path / "run.xlsx"
+    good_xlsx.write_bytes(b"fake-xlsx-bytes")
+    good_json = tmp_path / "run.json"
+    good_json.write_text("{}")
+    missing_html = tmp_path / "missing.html"  # never written
+
+    cfg = _cfg(database, tmp_path, retain_runs=True)
+    with pytest.raises(FileNotFoundError):
+        retention.store(
+            cfg,
+            "2026-08-17",
+            {"xlsx": str(good_xlsx), "json": str(good_json), "html": str(missing_html)},
+        )
+
+    with psycopg.connect(database) as conn:
+        count = conn.execute("select count(*) from run_outputs").fetchone()[0]
+    assert count == 0
+
+
+def test_retention_on_without_migration_stops_before_any_crm_call(
+    database, gong_calls, tmp_path
+):
+    """RETAIN_RUNS on with 0005 unapplied must fail immediately — not on the
+    last line of the run, after every Gong and CRM call."""
+    from quorom.weekly.run import MissingRunOutputsTable
+
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    with psycopg.connect(database, autocommit=True) as conn:
+        conn.execute("drop table run_outputs")
+
+    logged = []
+    with pytest.raises(MissingRunOutputsTable):
+        run_weekly(_cfg(database, tmp_path, retain_runs=True), log=logged.append)
+
+    # Stopped before step 1 (the attendee read) — nothing past the guards at
+    # the top of the block ran, and no file was emitted.
+    assert not any("attendee-rows" in line for line in logged)
+    assert list(tmp_path.iterdir()) == []
+
+
 def _headers(ws) -> list:
     return [h for h in next(ws.iter_rows(max_row=1, values_only=True)) if h]
 

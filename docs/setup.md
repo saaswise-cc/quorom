@@ -286,7 +286,7 @@ Create an empty repository in your own version control. What goes in it:
                     # names and non-secret values only, never a secret
 deploy/             # your pipeline: however the code reaches a machine
 schedule/           # your scheduled job definitions
-runs/               # every weekly run, committed — see section 14
+runs/               # if you keep runs here — see section 14
 README.md           # what this deployment is, who owns it, where the output goes
 ```
 
@@ -532,8 +532,8 @@ database rather than an untouched placeholder.
 > instance, or whoever administers it to run the `CREATE DATABASE` and hand
 > back a connection string scoped to the new one.
 
-**Why it wants a database to itself.** The four migrations create eight tables
-under plain, generic names: `accounts`, `meetings`, `attendees`, `people`,
+**Why it wants a database to itself.** The four core migrations create eight
+tables under plain, generic names: `accounts`, `meetings`, `attendees`, `people`,
 `person_identifiers`, `person_attendees`, `user_focus_profiles`,
 `crm_field_maps`. Point them at a database your business already uses and at
 least one of those names is likely already taken. Nothing gets destroyed —
@@ -609,6 +609,11 @@ They create empty tables and nothing else. `ON_ERROR_STOP=1` matters: without
 it `psql` carries on past a failed statement and leaves you a half-applied
 schema that looks fine.
 
+**`migrations/0005_run_outputs.sql` is not in that list.** It is optional — the
+table it creates is for keeping every weekly run in the database, a decision
+made in section 14, not something a run needs to start. Apply it there, if you
+choose it.
+
 Verify:
 
 ```bash
@@ -683,6 +688,7 @@ output and want to change something:
 | `TZ_OFFSET` | `-04` | The offset the week boundaries are cut on. |
 | `OUTPUT_DIR` | `output` | Where the three files land. |
 | `CUSTOMER_ACCOUNT_TYPES` | empty | Substrings of `Account.Type` marking an existing customer. Empty means the gate is off and ICP fit is employee band plus HQ geography only. Leave it off unless your `Type` field is genuinely maintained as a lifecycle field. |
+| `RETAIN_RUNS` | `false` | Store this run's `.xlsx`, `.json` and `.html` into `run_outputs` as the last step of `quorom weekly`. Off by default — a deployment that has not chosen retention must not silently start storing contact data. Section 14 has the migration and the grant this needs before turning it on. |
 
 > **`python-dotenv` does not override an exported variable.** If you export
 > something in your shell, that one wins over `.env`. Verify which one the
@@ -884,27 +890,107 @@ changed — a new map with an old date on it, not the map you produced.
 So a run that is not kept is gone. Keep all three files from every run: the
 `.xlsx`, the `.json` and the `.html`.
 
-Keep them somewhere private, durable, versioned, and readable by the agent
-working in your Claude project. The repository you created in step 2 (section
-5) is the obvious home — it is already all four of those things, and committing
-each week gives you a dated history at no cost.
+Keep them somewhere private, readable back later, and under access you
+control. "Readable back" does not mean a live connection from wherever someone
+happens to be asking — a short script that loads credentials and queries on
+demand satisfies it exactly as a file on disk does.
 
-**One thing to weigh before the first commit.** Git history is permanent by
-design. That is what makes it a good record, and it is also the reason to
-decide deliberately: these files carry real people's names, titles and CRM
-state, a commit cannot practically be un-made, and repository access at most
-companies is wider than the set of people who should be reading a stakeholder
-map. For most deployments that is a fair trade — it is your own private
-repository, and the same data already sits in your CRM and your database under
-access that is no narrower. If your organisation has a process for removing an
-individual's data on request, choose something you can delete from instead: a
-shared folder with restricted membership meets the same four properties, and so
-does the deployment's own database.
+Two places meet that. One is already part of your deployment; the other you
+created in step 2. This guide does not pick for you, but it does have a view
+about which is less work, and it is not the one people reach for first.
 
-**Not the directory you cloned this repository into.** `output/` is in the
-upstream `.gitignore` deliberately, because those files hold real contact data.
-That holds wherever they end up: the record goes somewhere you chose and
-control, never into a clone of an upstream repository.
+**Neither of them is the directory you cloned this repository into.** `output/`
+is in the upstream `.gitignore` deliberately, because those files hold real
+contact data. That holds wherever they end up: the record goes somewhere you
+chose and control, never into a clone of an upstream repository.
+
+#### Option A — your database
+
+You already have one. Section 8 had you provision PostgreSQL for the pipeline's
+own schema, so this adds a table rather than a system: nothing new to stand up,
+nothing new to pay for, and — the part most easily missed — no new write
+identity.
+
+That last one is the practical argument. A scheduled, unattended job that
+commits to version control needs a credential *into version control*: a deploy
+key or token to create, store where the runner can read it, and rotate on
+whatever schedule your organisation requires. The pipeline already holds
+database credentials, because it cannot run at all without them. Keeping runs
+in the database inherits an identity that exists; keeping them in a repository
+creates one.
+
+Three steps.
+
+**Apply migration 0005:**
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0005_run_outputs.sql
+```
+
+It creates one table, `run_outputs`, holding all three files from every run.
+The migration file's own header says why: no `account_id` (one deployment
+serves one account, so there is nothing here to scope against), and why
+`run_date` is written by the pipeline from the run's week start rather than
+inferred from today — storage can happen well after the run it belongs to, and
+a row dated by when it was stored is a row you cannot line up against
+anything.
+
+**Grant the pipeline's role `INSERT` and `SELECT` on it, and nothing else:**
+
+```sql
+GRANT INSERT, SELECT ON run_outputs TO <the role your pipeline connects as>;
+```
+
+No `UPDATE`, no `DELETE`. That makes the history append-only by privilege
+rather than by good intentions — which is the property people are usually
+reaching for when they reach for version control.
+
+**Then set `RETAIN_RUNS=true`** in your `.env` or your environment's secret
+store (section 9). It defaults off — a deployment that has not made this
+choice must not silently start storing contact data. Once it is on,
+`quorom weekly` writes all three files into `run_outputs` in a single
+transaction as its last step, so a partial failure leaves no rows rather than
+one file and the appearance of a stored run; it logs one line either way, so a
+run's log always says which case you were in — what it stored, or that
+retention is off.
+
+Append-only means a re-run adds a row rather than replacing one. That is
+correct — both attempts really happened — so read the most recent `created_at`
+for a given `run_date` rather than assuming one row per file per week.
+
+**Test the insert and the read as the pipeline's own role, with the credentials
+the scheduled job will use — not the login you created the table with.** A
+grant that reads correctly on the page can still be wrong for the identity that
+runs unattended, and the first time you find that out should not be a failed
+run at 3am that nobody is watching.
+
+#### Option B — the repository from step 2
+
+Also valid, and less work if you would rather not write a storage step at all:
+committing three files a week gives you a dated, diffable history for free, and
+`runs/` is already in the layout section 5 suggested.
+
+The thing to weigh is that **git history is permanent by design.** That is what
+makes it a good record, and it is why this should be a decision rather than a
+default. These files carry real people's names, titles and CRM state; a commit
+cannot practically be un-made; and repository access at most companies is wider
+than the set of people who should be reading a stakeholder map. For many
+deployments that is a fair trade — it is your own private repository, and the
+same data already sits in your CRM and your database under access that is no
+narrower. If your organisation has a process for removing an individual's data
+on request, it is the wrong trade, and Option A is the safer default.
+
+#### Durability is not automatic either way
+
+Worth stating plainly, because it is the property people most often assume they
+already have. Git history is permanent by construction — but only on the
+machines holding a copy of it. A database is durable exactly as far as its
+backups and point-in-time recovery reach, which is a question about your
+hosting rather than about PostgreSQL.
+
+Whichever you choose, find out what the answer actually is for your setup
+before you rely on it. This guide cannot tell you, and a retention plan resting
+on an unexamined assumption about backups is not yet a retention plan.
 
 **Why bother.** One run is a snapshot, and answers who you met. A year of runs
 is a series, and answers the questions actually worth asking — who is new at
@@ -926,6 +1012,7 @@ recovered later from runs you did not keep.
 | `accounts.internal_domains is empty` | `init` did not run, or ran without `--internal-domains`. Every attendee would be classified external. |
 | A run stops before doing anything, complaining about the focus profile | There is no active profile. This is a hard error on purpose: an absent profile makes the ICP test pass everything, and the output would look entirely normal and be wrong. |
 | A run stops complaining about the field map | Salesforce is configured but no map is stored. `quorom resolve-fields`. |
+| A run stops complaining that `run_outputs` does not exist | `RETAIN_RUNS` is on but migration `0005_run_outputs.sql` has not been applied. Apply it and grant the pipeline's role `INSERT` and `SELECT` on it — section 14. |
 | `[!] Gong credentials not configured` | `GONG_ACCESS_KEY` / `GONG_ACCESS_KEY_SECRET`. |
 | A wall of `401`s partway through a run | An expired pasted Salesforce token. It means "connected, token expired", not a network problem. Section 7 — and check whether an exported shell variable is winning over your `.env`. |
 | A column reads `not available in this CRM` | The field map resolved nothing for it. Expected, not a failure. `quorom resolve-fields` after your admin adds a field. |
