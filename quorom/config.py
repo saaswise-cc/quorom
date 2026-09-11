@@ -167,6 +167,22 @@ class Config:
             f"{end.isoformat()} 00:00:00{self.tz_offset}",
         )
 
+    def week_days_remaining(self) -> float:
+        """Days of the target week still in the future. Zero or less means it
+        has fully elapsed.
+
+        The default week is the one containing today, so a run reports on a
+        window that has not closed unless it is run late in that week or
+        `WEEK_START` names an earlier one. Mid-week by hand that is fine and
+        sometimes what you want. On a schedule it is the failure this exists to
+        catch: a job set for Monday morning reports a window a few hours old,
+        produces an artifact with headers and no rows, and exits zero. Nothing
+        else in the run has any way to notice.
+        """
+        _, end = self.week_bounds()
+        end_dt = dt.datetime.fromisoformat(end)
+        return (end_dt - dt.datetime.now(end_dt.tzinfo)).total_seconds() / 86400
+
     def missing(self) -> list[str]:
         """Env vars without which a weekly run cannot start at all."""
         gaps = []

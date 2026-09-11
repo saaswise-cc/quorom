@@ -59,6 +59,26 @@ def run_weekly(cfg: Config, log=print) -> dict:
     start, end = cfg.week_bounds()
     log(f"[*] Week window: {start} .. {end}  account={cfg.account}")
 
+    # Checked here, before anything is read or spent, because the failure it
+    # catches is silent: a run whose window has not closed completes cleanly and
+    # produces an artifact with no rows in it. Nothing downstream can tell that
+    # apart from a genuinely quiet week, and a scheduled job has nobody reading
+    # the output closely enough to ask.
+    #
+    # A warning rather than a refusal — a deliberate mid-week look is a
+    # legitimate thing to want, and this is the run saying what it is about to
+    # do, not stopping you doing it.
+    remaining = cfg.week_days_remaining()
+    if remaining > 0:
+        log(
+            f"[!] This week is not over — {7 - remaining:.1f} of 7 days have "
+            f"elapsed, {remaining:.1f} still ahead. The artifact will cover only "
+            f"the part that has happened, and run early enough it will have no "
+            f"rows at all. Deliberate mid-week run: expected. Scheduled: set "
+            f"WEEK_START, or move the schedule later in the week — "
+            f"docs/setup.md §13."
+        )
+
     sf = Salesforce(cfg)
     hs = HubSpot(cfg)
     if not sf.configured:

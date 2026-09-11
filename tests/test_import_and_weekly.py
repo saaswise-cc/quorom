@@ -177,6 +177,40 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     assert "not for publishing" in html
 
 
+def test_a_week_that_has_not_finished_says_so(database, gong_calls, tmp_path):
+    """The failure this catches is silent, which is why it is a log line rather
+    than a column: a run whose window has not closed completes cleanly and
+    produces an artifact with no rows. Nothing downstream can tell that apart
+    from a genuinely quiet week, and a scheduled job has nobody looking."""
+    import datetime as dt
+
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    # The week every other test pins is long past. No warning.
+    logged: list[str] = []
+    run_weekly(_cfg(database, tmp_path), log=logged.append)
+    assert not any("not over" in line for line in logged)
+
+    # The current week always has time left in it, whatever day the suite runs:
+    # the window ends next Monday 00:00 and now is necessarily before that.
+    today = dt.date.today()
+    this_monday = today - dt.timedelta(days=today.weekday())
+    logged = []
+    run_weekly(
+        _cfg(database, tmp_path, week_start=this_monday.isoformat()),
+        log=logged.append,
+    )
+    warnings = [line for line in logged if "This week is not over" in line]
+    assert len(warnings) == 1
+    # Names where to fix it, not just that something is off.
+    assert "WEEK_START" in warnings[0] and "§13" in warnings[0]
+
+    # And it is a warning, not a refusal — the run still produced its files.
+    assert (tmp_path / "last_run.json").exists()
+
+
 def test_tab_1_states_what_was_never_asked(database, gong_calls, tmp_path):
     """With no CRM configured, tab 1's CRM-derived columns must say the
     question was not asked. They used to assert answers: `GAP` in red on every
