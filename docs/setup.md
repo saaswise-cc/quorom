@@ -800,12 +800,36 @@ Or for a specific week:
 WEEK_START=2026-08-17 quorom weekly
 ```
 
-It writes three files into `OUTPUT_DIR` and nothing anywhere else — no writes
-back to Gong, Salesforce, HubSpot or anywhere in your CRM:
+It writes into `OUTPUT_DIR` and nowhere else — no writes back to Gong,
+Salesforce, HubSpot or anywhere in your CRM:
 
 - `weekly_stakeholder_map_<week>.xlsx` — the artifact, four tabs
 - `stakeholder_inputs_<week>.json` — every input the run read
 - `weekly_view_<week>.html` — a single-page view of the same thing
+- `last_run.json` — the manifest: the three paths above, plus the week they
+  belong to. Overwritten by each run.
+
+**The manifest is the supported way for anything downstream to find a run's
+files.** Whatever you write in section 14 to deliver or archive them should
+read it rather than rebuilding the filename pattern or parsing the
+`[✓] Wrote …` lines — those are not a versioned interface, and a change to
+either would break your delivery step silently, at the end of a run, after
+every Gong and CRM call had already been paid for. Its `schema` field is there
+so a future change to its shape is something you can detect:
+
+```json
+{
+  "html": "/srv/quorom/output/weekly_view_2026-08-17.html",
+  "json": "/srv/quorom/output/stakeholder_inputs_2026-08-17.json",
+  "schema": 1,
+  "week_start": "2026-08-17",
+  "xlsx": "/srv/quorom/output/weekly_stakeholder_map_2026-08-17.xlsx"
+}
+```
+
+Paths are absolute, so a delivery step does not have to share the run's working
+directory. The manifest is written last, after retention — so if it is there,
+the run finished.
 
 The four tabs:
 

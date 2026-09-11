@@ -6,6 +6,7 @@ only the sequence. docs/pipeline.md is the prose version of exactly this.
 
 from __future__ import annotations
 
+import json
 import os
 
 from .. import db, geography
@@ -247,4 +248,37 @@ def run_weekly(cfg: Config, log=print) -> dict:
     else:
         log("[i] RETAIN_RUNS is off — this run's files are not stored in the database.")
 
-    return {"xlsx": xlsx_path, "json": json_path, "html": html_path}
+    # The manifest is the contract anything downstream reads to find this run's
+    # files — a delivery step, an archival step, a notification. Without it the
+    # only ways to locate them are reconstructing the filename pattern or
+    # scraping the "[✓] Wrote …" lines above, and neither is a thing this
+    # project versions: a rename or a log tweak would break every deployment's
+    # delivery step silently, at the end of a run, after every Gong read and
+    # every CRM call have already been paid for.
+    #
+    # Written last, so its presence means the run finished — retention included,
+    # since that raises rather than returning. Paths are absolute because the
+    # reader is a separate process that need not share this one's cwd.
+    #
+    # Nothing here needs a precondition check at the start of the run: the three
+    # writes above have already proven output_dir is writable.
+    manifest = {
+        "schema": 1,
+        "week_start": week,
+        "xlsx": os.path.abspath(xlsx_path),
+        "json": os.path.abspath(json_path),
+        "html": os.path.abspath(html_path),
+    }
+    manifest_path = os.path.join(cfg.output_dir, "last_run.json")
+    with open(manifest_path, "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    log(f"[✓] Wrote {manifest_path}")
+
+    return {
+        "xlsx": manifest["xlsx"],
+        "json": manifest["json"],
+        "html": manifest["html"],
+        "week_start": week,
+        "manifest": manifest_path,
+    }

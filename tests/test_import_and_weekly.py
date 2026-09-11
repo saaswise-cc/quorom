@@ -177,6 +177,55 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     assert "not for publishing" in html
 
 
+def test_manifest_names_this_runs_files(database, gong_calls, tmp_path):
+    """The manifest is what a delivery step reads instead of reconstructing the
+    filename pattern or scraping the run's log. Enumerated here rather than
+    counted, so a change to its shape fails visibly."""
+    import os
+
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
+
+    manifest_path = tmp_path / "last_run.json"
+    assert manifest_path.exists()
+    assert paths["manifest"] == str(manifest_path)
+
+    manifest = json.loads(manifest_path.read_text())
+    assert sorted(manifest) == ["html", "json", "schema", "week_start", "xlsx"]
+    assert manifest["schema"] == 1
+    assert manifest["week_start"] == "2026-08-17"
+
+    for key in ("xlsx", "json", "html"):
+        # Absolute, because the reader is a separate process that need not
+        # share this one's working directory.
+        assert os.path.isabs(manifest[key])
+        assert os.path.exists(manifest[key])
+        assert manifest[key] == paths[key]
+
+
+def test_manifest_is_written_only_after_retention_succeeds(
+    database, gong_calls, tmp_path
+):
+    """Its presence has to mean the run finished. Retention is the last thing
+    that can fail, so the manifest must come after it, not before."""
+    from quorom.weekly.run import MissingRunOutputsTable
+
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    with psycopg.connect(database, autocommit=True) as conn:
+        conn.execute("drop table run_outputs")
+
+    with pytest.raises(MissingRunOutputsTable):
+        run_weekly(_cfg(database, tmp_path, retain_runs=True), log=lambda *_: None)
+
+    assert not (tmp_path / "last_run.json").exists()
+
+
 def test_retention_off_writes_nothing(database, gong_calls, tmp_path):
     """RETAIN_RUNS defaults off, and off must mean off: no row anywhere."""
     account_id = _seed_account(database)
