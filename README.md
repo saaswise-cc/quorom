@@ -207,8 +207,11 @@ run spends nothing. Every field in the output comes from your own systems.
 docs/setup.md                   how to stand a deployment up — start here
 docs/supported-configuration.md what is and is not supported today
 docs/pipeline.md                the six steps, and the read path each serves
+docs/reading-your-first-run.md  what to make of the output — send this to its reader
 docs/salesforce-access.md       the two Salesforce auth modes
-migrations/                     the schema, four files, applied in order
+docs/paas-deployment.md         worked example: running the schedule on a PaaS
+docs/slack-delivery.md          worked example: delivering a run to Slack
+migrations/                     the schema, applied in filename order
 quorom/                         the pipeline
 tests/                          run with `pytest`
 ```

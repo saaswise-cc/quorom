@@ -840,6 +840,11 @@ The four tabs:
 | **3 — Company coverage** | Every external company met: size, HQ, whether it meets your profile, how many contacts you hold |
 | **4 — Stakeholder list** | The map. The senior people at the ICP-fit companies worth considering, capped at `SHORTLIST_SIZE` each |
 
+**`docs/reading-your-first-run.md` is what to send to whoever receives this
+file.** It covers what to check first to know the run worked, what looks
+alarming and is not, and what a person does about each kind of gap — written
+for the reader of the map rather than for whoever stood the deployment up.
+
 **Things in the output that are deliberate, not defects.** Read
 `docs/supported-configuration.md` before concluding anything is broken:
 
@@ -879,6 +884,13 @@ Look first at whatever already runs alongside your database — if that platform
 offers scheduled tasks, it is the shortest path and the credentials are already
 near it.
 
+**If that platform is a PaaS, `docs/paas-deployment.md` is a worked example.**
+It covers the decision that determines everything else — whether your job stays
+running and is exec'd into, or is started fresh and expected to exit — because
+building for the wrong one produces a confusing failure either way. It also
+covers what your platform's alerting does and does not cover, which is the
+paragraph below.
+
 **A failed run does not currently retry.** Connection errors are not retried,
 deliberately: what should happen when a run fails is a decision about your
 schedule, not about the code. Decide it when you decide the runner, and make
@@ -897,6 +909,16 @@ An `.xlsx` in an output directory on a server is not a delivery. Somebody has to
 receive it — a person, a channel, a shared drive. This is the step that decides
 whether the map gets read, and it is the one most likely to be left until later
 and then never done.
+
+**`docs/slack-delivery.md` is a worked example of one answer** — posting the
+files to a Slack channel — including the decision that catches people out
+first, which is that an incoming webhook cannot attach a file at all.
+
+Whatever you choose, **have it read `last_run.json`** (section 12) to find the
+files rather than rebuilding their names or parsing the run's log. And decide
+who can see wherever you send it: these files carry real people's names, titles
+and CRM state, and a delivery surface's membership usually changes without
+anyone revisiting this choice.
 
 ### Where every run is kept
 

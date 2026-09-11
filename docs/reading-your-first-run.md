@@ -1,0 +1,117 @@
+# Reading your first run
+
+`setup.md` §12 lists what the four tabs contain. This file is about what to make
+of them — what to check first, what looks wrong and isn't, and what to actually
+do about each kind of gap.
+
+**It is written for whoever receives the file, not for whoever deployed it.**
+Those are often different people. If you set the deployment up, this is the
+thing to send along with the first run.
+
+## Before anything else: three things that tell you the run worked
+
+A run can complete, produce all four tabs, and still have done almost nothing —
+because the legs it needs were not configured, not because anything failed.
+That is deliberate: gaps are output, not errors. So the first pass is checking
+which legs actually ran.
+
+1. **Is tab 1 populated, and are the people on it external?** Colleagues should
+   not appear. If they do, your account's internal domains are wrong. If the tab
+   is empty, the week window found no meetings — check the window before
+   concluding anything about the data.
+2. **Does tab 3 have employee counts and HQs?** If those columns are populated,
+   your CRM leg ran. If `Meets profile` is blank on every row, it did not, and
+   nothing on tab 4 means what it looks like it means.
+3. **Does tab 4 have people on it?** If it carries a single explanatory row
+   instead, no company passed the filter. That is a real answer sometimes — but
+   check point 2 first, because an unassessed company cannot pass a filter it
+   was never tested against.
+
+Blank and false are different everywhere in this output. **Blank means the test
+did not run. False means it ran and the answer was no.** A column of blanks is
+a configuration fact about your deployment; a column of falses is a finding
+about your data.
+
+## What looks alarming and is not
+
+**A lot of people missing from the CRM.** This is the most common first
+reaction, and it is the product working. The gap between who your team meets
+and who reaches the CRM is the thing this exists to measure. A first run over
+real history usually surfaces more than people expect. That is a finding about
+your process, not a fault in the run.
+
+**Titles that are missing, wrong or years out of date.** The output reports
+what the CRM holds. Where it is stale, the map shows it as stale rather than
+quietly improving it.
+
+**Companies you do not recognise.** Recruiters, vendors, candidates and
+partners all end up in a meeting recorder. The run does not know which meetings
+were commercial.
+
+**Tab 4 much shorter than tab 3.** Expected. Tab 3 is every company met; tab 4
+is the ones that fit your profile, capped at `SHORTLIST_SIZE` people each.
+
+**`— no senior contact in Salesforce —` rows.** A company that fits your ICP
+where the CRM holds nobody senior. That is a stated gap rather than an omission,
+and it is usually the most useful line in the file.
+
+**Meeting bots and notetakers at the foot of tab 2.** Attendees with neither an
+email nor a domain are suppressed there visibly rather than dropped, so you can
+see what was removed.
+
+## What actually indicates something is wrong
+
+- **Every row on tab 1 flagged with a red `GAP` and a blank LinkedIn**, when you
+  do have a CRM configured. With no CRM configured this is known and harmless
+  (it displays rather than filters). With one configured, the CRM leg is not
+  reaching your data.
+- **Companies you know are large showing no employee count.** A company with no
+  count is excluded from the map entirely rather than given the benefit of the
+  doubt, so this silently shrinks tab 4.
+- **`HQ unknown` where you know the HQ.** `HQ unknown` and `HQ not in region`
+  are different rows: the first is missing data, the second is a decision your
+  profile made.
+- **People appearing twice under different addresses.** Someone who changed
+  email address can split into two people, which also makes a recent contact
+  read as "no".
+
+## What to do with each kind of gap
+
+**Nothing in this list happens automatically.** Quorom reads your CRM and
+writes nothing back to it — not to Salesforce, not to HubSpot, not to Gong. The
+output is a list of things for a person to decide about, and every action below
+happens in your own systems.
+
+| What you see | What it means | What a person does |
+|---|---|---|
+| Met, not in CRM | Somebody your team spoke to has no record | Decide whether they belong there, then add them. This is the most directly actionable thing in the file. |
+| In CRM, no title | The record exists but is thin | Fill it in at the source, so next week's run reads it |
+| Company met, no employee count | Excluded from the map entirely | Fill the firmographics if the company matters to you |
+| Fits profile, no senior contact | The stakeholder gap | Find who the senior people there are. This is where a data provider or a browser extension earns its place, and it is a person's step, not a pipeline's. |
+| Fits profile, senior contacts present | The map did its job | Decide who is worth approaching |
+
+**No action is suggested per person, deliberately.** The output says who is
+worth considering and stops. Outreach is a sequence — connect, perhaps message,
+perhaps request a meeting — and the run does not decide that sequence for you.
+
+**Nobody is checked for still being at the company.** CRM contacts go stale and
+the run cannot tell. There is no column claiming otherwise, which is preferable
+to one that says "not checked" on every row.
+
+## Why the second run is worth more than the first
+
+One run answers who you met. A series answers the questions that are actually
+worth asking — who is new at this company, whose title changed, which coverage
+gap closed, which company went quiet. None of that can be read from a single
+file, and none of it can be recovered later from runs you did not keep. That is
+what §14's retention requirement is for.
+
+## If something looks wrong that is not listed here
+
+`docs/supported-configuration.md` is the honest account of what this does and
+does not handle. Read it before concluding anything is broken — several of the
+things that look like defects are documented decisions.
+
+Mistakes in companies, people and titles are expected. The value is not that
+the output is perfect; it is that this reconciliation does not otherwise happen
+at all.
