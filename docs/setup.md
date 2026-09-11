@@ -66,9 +66,34 @@ Four things. The first three take minutes; the fourth is the rest of this guide.
 4. **A running deployment** — a PostgreSQL database, the pipeline installed
    against it, and a schedule that runs it.
 
+**The first three are once per organisation. The fourth is once per
+deployment.** That distinction matters twice: if you stand up a second
+deployment later — a different region, a separate business unit — you repeat
+only sections 7 onward, reusing the project, the repository and the tracker.
+And when you come back to upgrade, sections 1 to 6 are already done and you are
+looking at section 16.
+
 ---
 
 ## 3. Before you start
+
+### First: does this apply to you at all?
+
+Three questions. If any answer is no, stop here rather than several sections in.
+
+1. **Is Gong your meeting source?** It is the only importer that exists. No
+   Zoom, no Teams, no Fireflies, no Otter.
+2. **Is Salesforce your CRM?** HubSpot works as a secondary source of marketing
+   contacts, but the reconciliation, the firmographics and the stakeholder bench
+   are all read from Salesforce. HubSpot as your *primary* CRM is not supported.
+3. **Do you meet the people you want mapped?** The whole pipeline starts from
+   recorded meetings. A company nobody has met has no row anywhere in the
+   output.
+
+`docs/supported-configuration.md` is the longer version of this, including what
+happens at the edges. If you answered no to 1 or 2, that file is the honest
+account of what it would take, and nothing in this guide will work in the
+meantime.
 
 ### Two machines, and they are not the same question
 
@@ -137,13 +162,21 @@ workstation.
 
 | You need | Why | How to check |
 |---|---|---|
-| **PostgreSQL 13 or later**, reachable from both machines | The product database. `gen_random_uuid()` is built in from 13. | `psql "<your connection string>" -c "select version();"` |
+| **PostgreSQL 13 or later**, reachable from both machines | The product database. `gen_random_uuid()` is built in from 13. | Reachability first: `nc -z -w5 <host> <port>`. Then the real thing: `psql "<your connection string>" -c "select version();"` |
 | **Python 3.11 or later** on the workstation | The pipeline is Python. | `python3 --version` |
 | **`psql`** on the workstation | Four SQL files to run | `psql --version` |
 | **Gong API credentials** — an access key and secret, **read-only** | The meeting source. Everything downstream reads meetings imported from here. | Gong admin → API |
 | **Outbound network to `api.gong.io`** from both machines | The overnight job needs it too, not just your workstation | `curl -sI https://api.gong.io` |
-| **Salesforce access** — see section 7 | The CRM half of the map: reconciliation, firmographics, the senior contact bench | |
+| **Salesforce access** — see section 7 | The CRM half of the map: reconciliation, firmographics, the senior contact bench | `curl -sI https://<your-domain>.my.salesforce.com` — a `401` or a redirect is a pass. You are testing the network path, not the credentials; those come in section 7. |
 | **A HubSpot private-app key** *(optional)* | Marketing contacts. Absent, the HubSpot columns are left out of the output entirely rather than reported as "no" or as a contact count of 0. | |
+
+**Check reachability before credentials, for the database especially.** `psql`
+tests the network path and the password in one shot, and a timeout and a wrong
+password produce errors that are easy to confuse — which matters most when the
+database sits behind a private network or a VPN, exactly where you are most
+likely to be looking at the wrong problem. `nc -z -w5 <host> <port>` needs no
+credentials and answers only the first question. If that fails, no connection
+string will help until the network path exists.
 
 **What the Gong key needs, and what it must not have.** Read-only, covering
 **Calls** — including attendee data, which is the half the whole stakeholder
@@ -174,8 +207,16 @@ alongside you — including the steps that are fiddlier than they look. That is
 the working arrangement section 2 describes and the rest of this document
 assumes.
 
-Create a project in Claude. Give it these instructions — this is the text that
-makes an agent in the project useful rather than guessing:
+Create a project in Claude. All three fields, ready to fill in and paste:
+
+**Name:** `Quorom — <YOUR COMPANY>`
+
+**Description:** `Our Quorom deployment: weekly stakeholder maps from recorded
+meetings, reconciled against Salesforce. Code is read from upstream, never
+edited here.`
+
+**Instructions** — this is the text that makes an agent in the project useful
+rather than guessing:
 
 ```
 This project runs a Quorom deployment for <YOUR COMPANY>.
@@ -193,7 +234,8 @@ Our deployment:
 - Database: <where>
 - Meeting source: Gong
 - CRM: Salesforce
-- Weekly output lands: <where>
+- Scheduled by: [TBD — section 13]
+- Weekly output lands: [TBD — section 14]
 
 House rules for this project:
 - Every number names its source, or says unknown.
@@ -203,6 +245,19 @@ House rules for this project:
 - Never put a credential in this project or in a conversation. Name where a
   secret lives; never its value.
 ```
+
+**Move this conversation into the project now.** Not "at some point", not when
+it next comes up — immediately, before you read the next section. Everything
+after this assumes the agent working alongside you has these instructions
+loaded, and a conversation started outside the project does not get them no
+matter how good the instructions are. This is the single easiest step in the
+guide to nod at and skip, and skipping it makes the text you just wrote inert
+for the session that wrote it.
+
+**Then add anyone else who will touch this deployment.** At minimum whoever
+administers your infrastructure — section 13 is their decision, and section 7
+may need them too. Anyone you will have to ask for access should be able to see
+why, without you relaying it.
 
 > **`<YOUR REPO URL>` does not exist yet, and that is fine.** You create that
 > repository in step 2. Leave the placeholder alone for now and fill it in when
@@ -311,6 +366,23 @@ cannot answer for you get tracked and closed:
 - **Where the finished file lands, and where every run is kept** (section 14).
   The first decides whether anyone reads the output at all. The second decides
   whether you can ever ask what changed.
+
+**Nothing in the pipeline reads your tracker.** No integration, no API call, no
+configuration pointing at it. It is where *people* keep the decisions this guide
+deliberately does not make for you, and any tracker does that job — Linear is
+named because it is what upstream uses, not because anything depends on it.
+
+**If your tracker has an integration for the agent in your project, connect it
+now.** Without one, every issue is written by hand and pasted across, which is
+the friction that ends with decisions not getting recorded at all — and an
+undocumented decision about the runner or the output destination is exactly what
+this project exists to prevent.
+
+**Four milestones, if you want them**, matching where this guide actually
+stalls: *access and infrastructure* (sections 7–8), *first install and import*
+(9–11), *first weekly run* (12), *scheduled and delivered* (13–14). Setup tends
+to stop at a boundary between those rather than mid-section, so they are useful
+for saying where you are.
 
 ---
 
@@ -478,6 +550,14 @@ project's editable install needs. The failure does not mention Python or pip; it
 says `File "setup.py" or "setup.cfg" not found`, which sends you looking for a
 missing file that is not supposed to exist. Upgrading pip first is what turns
 that into a working install or an honest "requires a different Python" message.
+
+**If `python3.12` is not there at all**, you get `command not found` — a stock
+Mac is exactly where a newer interpreter is least likely to already be present,
+so fixing one missing-file error by naming the interpreter just produces a
+different one. Install a 3.11+ interpreter through whatever package manager you
+use (on macOS, Homebrew: `brew install python@3.12`), then run the venv line
+again. Do not fall back to bare `python3` to get past it — that is the 3.9 this
+paragraph is about, and it fails later and less clearly.
 
 **Why `.[dev]` and not `.`** — `python-dotenv` lives in the `dev` extra, and it
 is what reads the `.env` file you are about to write in section 9. Install with
@@ -676,6 +756,22 @@ GONG_ACCESS_KEY_SECRET=
 
 Then Salesforce per section 7, and `HUBSPOT_SERVICE_KEY` if you have one.
 
+`.env.example` lists both Salesforce auth modes together. Only one of them
+applies to you, and nothing in the file says which — so mark it as you edit:
+
+```bash
+# Client credentials — the mode a scheduled run uses.
+SF_TOKEN_URL=
+SF_CLIENT_ID=
+SF_CLIENT_SECRET=
+
+# For a deployed or scheduled run, leave these two blank — see the
+# client-credentials mode above. The code prefers a pasted token whenever it
+# finds one, so a leftover value here silently keeps the two-hour path in use.
+SF_ACCESS_TOKEN=
+SF_INSTANCE_URL=
+```
+
 Everything else has a default and can be left alone until you have seen an
 output and want to change something:
 
@@ -686,7 +782,7 @@ output and want to change something:
 | `GROUP_CALL_MIN` | 8 | Above this many external attendees, a meeting is labelled a group call on the row — so a training webinar does not read as a relationship. |
 | `WEEK_START` | current week | Monday of the target week, `YYYY-MM-DD`. |
 | `TZ_OFFSET` | `-04` | The offset the week boundaries are cut on. |
-| `OUTPUT_DIR` | `output` | Where the three files land. |
+| `OUTPUT_DIR` | `output` | Where a run's output lands — the workbook, the JSON, the HTML view and `last_run.json`. |
 | `CUSTOMER_ACCOUNT_TYPES` | empty | Substrings of `Account.Type` marking an existing customer. Empty means the gate is off and ICP fit is employee band plus HQ geography only. Leave it off unless your `Type` field is genuinely maintained as a lifecycle field. |
 | `RETAIN_RUNS` | `false` | Store this run's `.xlsx`, `.json` and `.html` into `run_outputs` as the last step of `quorom weekly`. Off by default — a deployment that has not chosen retention must not silently start storing contact data. Section 14 has the migration and the grant this needs before turning it on. |
 
@@ -737,6 +833,12 @@ account, the focus profile, and the field map with the fields it resolved and
 the percentage of records populating each. Read that third block. It is the only
 place you will see which field the pipeline decided means "employee count" in
 your org, and whether that was right.
+
+**Two field names joined by an arrow — `NumberOfEmployees → Headcount__c` — is a
+fallback chain, not a replacement.** It means: try the first; if that record's
+value is blank, fall back to the next. Both fields are live, and a company can
+be resolved by either. Read it as "A, or B where A is empty" rather than "A was
+renamed to B".
 
 **Without Salesforce configured** you get two `[✓]` and one `[i]`, and that is a
 successful run, not a failed one:
@@ -808,6 +910,11 @@ Salesforce, HubSpot or anywhere in your CRM:
 - `weekly_view_<week>.html` — a single-page view of the same thing
 - `last_run.json` — the manifest: the three paths above, plus the week they
   belong to. Overwritten by each run.
+
+**Opening them.** `open <your OUTPUT_DIR>/` shows the folder, or open one
+directly — `open <your OUTPUT_DIR>/weekly_stakeholder_map_<week>.xlsx` for the
+workbook, or the `.html` for the same thing in a browser without Excel. Obvious
+if you live in a file manager; less so after eleven sections of terminal.
 
 **The manifest is the supported way for anything downstream to find a run's
 files.** Whatever you write in section 14 to deliver or archive them should
