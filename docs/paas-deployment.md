@@ -104,3 +104,18 @@ string the platform generates for you. If your platform injects a
 `DATABASE_URL` and offers somewhere to append parameters to it, that is still
 the connection-string route, and still the one that fails silently under
 pooling.
+
+## If you store runs yourself
+
+Most deployments should not. `RETAIN_RUNS` and migration `0005_run_outputs.sql`
+(setup.md §14, Option A) do this for you, in one transaction, append-only by
+privilege rather than by good intentions.
+
+If you have written your own storage anyway — a table of your own, a row per
+run — **put a uniqueness constraint on whatever identifies the run, and use
+`INSERT … ON CONFLICT … DO UPDATE` rather than a plain `INSERT`.** A retried run
+or a deliberate re-run of the same period will otherwise insert a second row
+that looks exactly like the first, with nothing to catch it. Re-running is a
+normal thing to do here — importing is idempotent by design, so nothing else in
+the pipeline discourages it — which makes your storage the one place that
+notices, or doesn't.

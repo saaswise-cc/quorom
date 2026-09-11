@@ -32,7 +32,7 @@ API, and it's easy to build the webhook path halfway before hitting it.
 2. Invite the bot to the channel you want it posting to. Creating the app and
    installing it does not do this by itself — the bot has no channels until you
    add it to one, same as a human user would.
-3. Get the channel's ID, not its name. `files.uploadV2` (below) takes the ID
+3. Get the channel's ID, not its name. `files_upload_v2` (below) takes the ID
    (e.g. `C0123ABCDEF`), not `#your-channel`.
 4. Store the bot token (`xoxb-...`) in whatever secret store your deployment
    already uses for the Salesforce/Gong credentials — never in `.env` for a
@@ -56,6 +56,13 @@ code, add it there; if your only install step is `pip install -e .` against
 this repo, add a small separate dependency file for your own scripts and
 install it as an extra step, so it stays clearly distinguished from Quorom's
 own pinned dependencies rather than merged into them.
+
+**If you build your own image, the dependency file and the script are two
+separate things to add to it.** Adding a `COPY` for `requirements.txt` does not
+put `deliver_to_slack.py` in the image. It is easy to add one and forget the
+other, and the failure is neither loud nor early: the build succeeds, the image
+looks right, and the delivery step fails at run time with a plain "file not
+found" — after the weekly run has already done all its work.
 
 ## Finding the files: read the manifest
 

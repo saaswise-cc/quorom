@@ -780,7 +780,7 @@ output and want to change something:
 | `RECENT_DAYS` | 90 | How far back still counts as recent contact — **and** how far back `quorom import` reaches with no dates given. One number deliberately: importing less than the recency window puts "no" next to people you met inside it. |
 | `SHORTLIST_SIZE` | 3 | People per company on the stakeholder list. The cap is a feature. |
 | `GROUP_CALL_MIN` | 8 | Above this many external attendees, a meeting is labelled a group call on the row — so a training webinar does not read as a relationship. |
-| `WEEK_START` | current week | Monday of the target week, `YYYY-MM-DD`. |
+| `WEEK_START` | current week | Monday of the target week, `YYYY-MM-DD`. Unset, it means the week **containing today** — which is not the same as last week, and is the trap section 13 exists to warn about. Read §13 before scheduling anything. |
 | `TZ_OFFSET` | `-04` | The offset the week boundaries are cut on. |
 | `OUTPUT_DIR` | `output` | Where a run's output lands — the workbook, the JSON, the HTML view and `last_run.json`. |
 | `CUSTOMER_ACCOUNT_TYPES` | empty | Substrings of `Account.Type` marking an existing customer. Empty means the gate is off and ICP fit is employee band plus HQ geography only. Leave it off unless your `Type` field is genuinely maintained as a lifecycle field. |
@@ -911,6 +911,12 @@ Salesforce, HubSpot or anywhere in your CRM:
 - `last_run.json` — the manifest: the three paths above, plus the week they
   belong to. Overwritten by each run.
 
+**The HTML is rendered from the `.xlsx`, not generated alongside it.** The run
+writes the workbook first and then reads it back to build the view, so the two
+cannot disagree — but it also means the `.xlsx` has to exist, at that path, at
+that moment. If your deployment moves or cleans up output files as part of the
+run, do it after all four are written, not between them.
+
 **Opening them.** `open <your OUTPUT_DIR>/` shows the folder, or open one
 directly — `open <your OUTPUT_DIR>/weekly_stakeholder_map_<week>.xlsx` for the
 workbook, or the `.html` for the same thing in a browser without Excel. Obvious
@@ -981,7 +987,30 @@ Two jobs:
 | Job | Command | When |
 |---|---|---|
 | Overnight import | `quorom import --yesterday` | Daily, after your calls have finished syncing to Gong |
-| Weekly run | `quorom weekly` | Weekly, after the last import of the week |
+| Weekly run | `quorom weekly` | **After the target week's meetings have happened** — Friday evening or Saturday, not Monday morning. Read the next paragraph before choosing. |
+
+### The week it reports on is the week you are in
+
+**This is the one scheduling decision that fails silently.** With no
+`WEEK_START` set, a run covers the Monday-to-Monday window *containing today*.
+Schedule it for Monday 07:00 and that window is seven hours old: the run
+succeeds, exits zero, reports no error, and writes an artifact with headers and
+no rows. Every check you have says it worked.
+
+Two shapes are safe. **Run late in the target week** — Friday evening or
+Saturday, once Monday to Friday has actually happened. Or **run after the week
+closes with `WEEK_START` set explicitly** to that Monday, which is the only way
+to report a week you are no longer in.
+
+The shape that looks most obvious is the broken one: scheduling Monday morning
+to pick up the week just gone. There is no "last week" default to fall back on —
+by Monday the default has already rolled forward, so you report a week that has
+barely started rather than the one you meant.
+
+`quorom weekly` warns when the window it is about to use has not closed, naming
+how much of it has elapsed. That is a warning and not a refusal, because running
+mid-week deliberately is a reasonable thing to want. On a schedule, treat it as
+the schedule being wrong.
 
 What the runner needs: the repository at a known commit, the Python environment,
 the environment variables from your secret store, outbound network to
