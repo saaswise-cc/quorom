@@ -14,7 +14,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 from ..config import Config
-from ..crm.fieldmap import NOT_AVAILABLE
+from ..crm.fieldmap import NOT_AVAILABLE, NOT_CHECKED
 from .stakeholders import NO_SENIOR_CONTACT
 
 HEADER_FILL = "2F5B7C"
@@ -33,11 +33,24 @@ def _sheet(wb: Workbook, title: str, headers: list[str]):
 
 
 def _linkedin_cell(value) -> str:
-    """None is not False. A CRM with no LinkedIn field says so in the cell, so a
-    blank column cannot be read as 'nobody has one'."""
+    """None is not False, and neither is NOT_CHECKED. A CRM with no LinkedIn
+    field says so in the cell, a run with no CRM says *that*, and only a real
+    False renders blank — so an empty column cannot be read as 'nobody has
+    one'."""
+    if value == NOT_CHECKED:
+        return NOT_CHECKED
     if value is None:
         return NOT_AVAILABLE
     return "yes" if value else ""
+
+
+def _mobile_cell(value) -> str:
+    """`GAP` is a finding about a CRM that was asked. With none configured there
+    is nothing to have a gap in, so the cell says so rather than flagging every
+    row red against a system that was never called."""
+    if value == NOT_CHECKED:
+        return NOT_CHECKED
+    return "yes" if value else "GAP"
 
 
 def _crms_queried(cfg: Config) -> list[str]:
@@ -68,6 +81,19 @@ def build_workbook(
     wb.remove(wb.active)
 
     # Tab 1 — Met this week
+    #
+    # Three of these columns report what a CRM holds — the title, the LinkedIn
+    # presence and the mobile presence. With no CRM configured none of them was
+    # asked, so they are dropped rather than filled, exactly as tabs 2 and 3
+    # drop the columns of a provider that was never queried. The tab itself
+    # survives: who attended is answerable from the meeting source alone, which
+    # is what makes this different from tab 2.
+    #
+    # Dropped rather than rendered "not checked" because a whole column of it on
+    # every row is noise, and the absent header says the same thing once. The
+    # distinction still exists in the data — reconcile() emits NOT_CHECKED — so
+    # nothing downstream has to re-derive it.
+    crm_on = cfg.salesforce.configured or cfg.hubspot.configured
     ws1 = _sheet(
         wb,
         "1 - Met this week",
@@ -76,20 +102,19 @@ def build_workbook(
         # imprecise even with Salesforce configured, and names a system that was
         # never called without it. Which system holds a differing title is
         # already stated in Flag, and the next column is "Mobile in CRM?".
-        ["Name", "Email", "Title (CRM)", "LinkedIn?", "Mobile in CRM?", "Flag", "Source"],
+        ["Name", "Email"]
+        + (["Title (CRM)", "LinkedIn?", "Mobile in CRM?"] if crm_on else [])
+        + ["Flag", "Source"],
     )
     for r in reconciled:
-        ws1.append(
-            [
-                r.get("attendee_name"),
-                r.get("email", ""),
+        row = [r.get("attendee_name"), r.get("email", "")]
+        if crm_on:
+            row += [
                 r.get("title", ""),
                 _linkedin_cell(r.get("linkedin_in_crm")),
-                "yes" if r.get("mobile_in_crm") else "GAP",
-                r.get("flag", ""),
-                "gong",
+                _mobile_cell(r.get("mobile_in_crm")),
             ]
-        )
+        ws1.append(row + [r.get("flag", ""), "gong"])
 
     # Tab 2 — Missing from CRM
     #

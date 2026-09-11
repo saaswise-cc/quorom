@@ -177,6 +177,59 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     assert "not for publishing" in html
 
 
+def test_tab_1_states_what_was_never_asked(database, gong_calls, tmp_path):
+    """With no CRM configured, tab 1's CRM-derived columns must say the
+    question was not asked. They used to assert answers: `GAP` in red on every
+    row, `needs title` on every named attendee, and a blank LinkedIn cell
+    indistinguishable from 'we looked and found none'.
+
+    The three CRM-derived columns are dropped, the same answer tabs 2 and 3
+    already give for a provider that was never queried — the tab survives
+    because who attended comes from the meeting source, not the CRM."""
+    from quorom.crm.fieldmap import NOT_CHECKED
+
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
+    ws = load_workbook(paths["xlsx"])["1 - Met this week"]
+
+    # Enumerated, not counted: a column added or removed fails here visibly.
+    assert _headers(ws) == ["Name", "Email", "Flag", "Source"]
+
+    flag = _headers(ws).index("Flag")
+    rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] or r[1]]
+    assert rows, "no attendees rendered — the rest of this test proves nothing"
+
+    # "needs title" is a finding about a CRM. None was asked, so it cannot be
+    # asserted about anyone.
+    assert not any("needs title" in (r[flag] or "") for r in rows)
+
+    # The rest is asserted against reconcile() directly: the fixture has no
+    # nameless attendee, so going through the workbook would leave the
+    # name-check half of this proving nothing.
+    from quorom.crm.hubspot import HubSpot
+    from quorom.crm.salesforce import Salesforce
+    from quorom.weekly.people import reconcile
+
+    cfg = _cfg(database, tmp_path)
+    sf, hs = Salesforce(cfg), HubSpot(cfg)
+    assert not sf.configured and not hs.configured
+
+    # The distinction still exists in the data even though no column shows it,
+    # so nothing downstream has to re-derive which legs ran.
+    named = reconcile({"email": "d@northwind.com", "attendee_name": "Dana"}, sf, hs)
+    assert named["mobile_in_crm"] == NOT_CHECKED
+    assert named["linkedin_in_crm"] == NOT_CHECKED
+    assert "needs" not in named["flag"]
+
+    # The name check is not CRM-derived and must survive — it comes from the
+    # meeting, so it is still answerable with no CRM at all.
+    nameless = reconcile({"email": "x@northwind.com", "attendee_name": ""}, sf, hs)
+    assert nameless["flag"] == "needs name"
+
+
 def test_manifest_names_this_runs_files(database, gong_calls, tmp_path):
     """The manifest is what a delivery step reads instead of reconstructing the
     filename pattern or scraping the run's log. Enumerated here rather than
@@ -535,8 +588,15 @@ def test_no_crm_does_not_silently_empty_the_stakeholder_map(
     assert all(r[1] != NO_SENIOR_CONTACT for r in tab4)
 
     # Tab 1 — the header no longer names a CRM this run never called.
-    assert "Title (CRM)" in _headers(wb["1 - Met this week"])
+    #
+    # An earlier fix renamed this column "Title (SF)" → "Title (CRM)" and
+    # asserted the renamed column was present. This goes further: with no CRM
+    # configured the title was empty on every row anyway, so the column is
+    # dropped rather than renamed — the same answer tabs 2 and 3 give. The
+    # "(SF)" assertion is what mattered and it still holds — a header naming an
+    # uncalled system is the defect, and no header can name one now.
     assert "Title (SF)" not in _headers(wb["1 - Met this week"])
+    assert "Title (CRM)" not in _headers(wb["1 - Met this week"])
 
     # The dump carries the third state as its own field, so "could not assess"
     # cannot later be re-read as "assessed and rejected".

@@ -220,7 +220,11 @@ the JSON dump. `linkedin` is three-valued — a URL, `""` for nothing on file, a
 **Cost:** none — customer-owned data in both systems.
 
 **Read path served:**
-- tab 1 — `Title (CRM)`, `LinkedIn?`, `Mobile in CRM?`, `Flag`
+- tab 1 — `Title (CRM)`, `LinkedIn?`, `Mobile in CRM?`, `Flag`. The first three
+  report what a CRM holds, so with no CRM configured they are dropped rather
+  than filled — the same answer tab 2 gives below. The tab itself survives:
+  who attended comes from the meeting source. `Flag` survives too, minus its
+  `needs title` half, which is a finding about a CRM that was not asked.
 - tab 2 — `In HubSpot?`, `In Salesforce?`, and which rows appear there at all.
   One column per CRM that was actually configured: an unqueried CRM is not a
   column of "not checked", it is not a column. Both are kept when both are on,
@@ -367,9 +371,11 @@ quorom import --yesterday                          # the overnight run
 WEEK_START=2026-08-17 quorom weekly                # the artifact
 ```
 
-`quorom weekly` writes three files into `OUTPUT_DIR`: the workbook, the JSON
-dump of every input, and the single-page HTML view. It writes nothing anywhere
-else.
+`quorom weekly` writes into `OUTPUT_DIR`: the workbook, the JSON dump of every
+input, the single-page HTML view, and `last_run.json` — the manifest naming
+those three and the week they belong to, so a delivery or archival step can find
+them without rebuilding the filename pattern or parsing the run's log. It writes
+nothing anywhere else.
 
 **What the tests cover, and what they cannot.** `pytest` runs the importer and
 the whole weekly sequence against a real Postgres with the real migrations and

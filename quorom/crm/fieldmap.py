@@ -41,6 +41,12 @@ from typing import Any, Iterable, Optional
 
 NOT_AVAILABLE = "not available in this CRM"
 
+# The CRM was never asked, so there is no answer to report — as distinct from
+# NOT_AVAILABLE, which means a CRM *was* asked and holds no such field. Both
+# differ again from a plain False, which is a CRM answering "no". Collapsing any
+# of the three into another has been the same defect three times over.
+NOT_CHECKED = "not checked"
+
 
 @dataclass(frozen=True)
 class FieldSpec:

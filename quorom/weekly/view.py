@@ -23,6 +23,7 @@ import re
 
 from openpyxl import load_workbook
 
+from ..crm.fieldmap import NOT_CHECKED
 from .coverage import NOT_ASSESSED
 from .stakeholders import ICP_NOT_ASSESSED
 
@@ -68,7 +69,10 @@ def cell(col: str, value: str) -> tuple[str, str]:
     # put back in colour the conflation the value itself removes. Matched
     # against the constants rather than a copy of the words, so the page cannot
     # drift from the workbook.
-    if value in (NOT_ASSESSED, ICP_NOT_ASSESSED):
+    # NOT_CHECKED belongs in this bucket, not with NO/GAP below: a question that
+    # was never asked is a non-answer, and colouring it as a negative is the
+    # same conflation in CSS that the value itself no longer carries.
+    if value in (NOT_ASSESSED, ICP_NOT_ASSESSED, NOT_CHECKED):
         return "na", v
     if col == "Meets profile?":
         return ("ok", v) if v == "yes" else ("rej", v)

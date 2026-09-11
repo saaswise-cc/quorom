@@ -12,6 +12,7 @@ import re
 from typing import Optional
 
 from ..crm.contact import Contact
+from ..crm.fieldmap import NOT_CHECKED
 from ..crm.hubspot import HubSpot
 from ..crm.salesforce import Salesforce
 
@@ -118,19 +119,20 @@ def company_mismatch(domain: Optional[str], crm_company: Optional[str]) -> bool:
 
 
 def _linkedin_presence(sf: Salesforce, contact: Optional[Contact]):
-    """Three answers, because there are three situations.
+    """Four answers, because there are four situations.
 
     True/False — the CRM has a LinkedIn field and this person does or does not
     have one on file. None — the CRM has no such field at all, which the column
-    states rather than rendering as an absent URL.
+    states rather than rendering as an absent URL. NOT_CHECKED — no CRM was
+    configured, so nothing was asked about this person at all.
 
-    Salesforce being unconfigured still answers False here, which is how the
-    whole column already behaves in a run without a CRM. Making that read "not
-    checked" is the same conflation tab 2 fixed for In Salesforce?, and it is
-    not this change.
+    That last one used to answer False, which rendered as a blank cell
+    indistinguishable from "we looked and they have no LinkedIn". This
+    function's own docstring named that as the conflation tab 2 had fixed, and
+    deferred it. It is no longer deferred.
     """
     if not sf.configured:
-        return False
+        return NOT_CHECKED
     if not sf.linkedin_available:
         return None
     return bool(contact.linkedin) if contact else False
@@ -146,6 +148,11 @@ def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
     hs_rec = hs.contact_by_email(email) if email else None
     sf_rec = sf.contact_by_email(email) if email else None
 
+    # Whether any CRM was asked at all. Every column below that reports what a
+    # CRM holds has to distinguish "asked, and the answer is no" from "never
+    # asked" — otherwise the run asserts facts about people nobody looked up.
+    crm_queried = sf.configured or hs.configured
+
     sf_title = sf_rec.title if sf_rec else ""
     hs_title = hs_rec.title if hs_rec else ""
     title = sf_title or hs_title
@@ -159,7 +166,12 @@ def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
         name = person.get("attendee_name")
         if not (name and str(name).strip()):
             missing.append("name")
-        if not title:
+        # A missing title is only a finding if a CRM was asked for one. With no
+        # CRM configured `title` is empty for everyone, and flagging "needs
+        # title" on every named attendee reports a gap in a system that was
+        # never consulted. The name check stays either way — that comes from the
+        # meeting, not the CRM.
+        if crm_queried and not title:
             missing.append("title")
         if missing:
             flags.append("needs " + " + ".join(missing))
@@ -175,9 +187,12 @@ def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
         # None means not checked — never conflated with "not found".
         "in_salesforce": bool(sf_rec) if sf.configured else None,
         "title": title,
-        # Presence only. The number itself never enters the artifact.
-        "mobile_in_crm": bool(
-            (sf_rec and sf_rec.mobile) or (hs_rec and hs_rec.mobile)
+        # Presence only. The number itself never enters the artifact — and with
+        # no CRM asked there is no presence to report, rather than an absence.
+        "mobile_in_crm": (
+            bool((sf_rec and sf_rec.mobile) or (hs_rec and hs_rec.mobile))
+            if crm_queried
+            else NOT_CHECKED
         ),
         "linkedin_in_crm": _linkedin_presence(sf, sf_rec),
         "flag": "; ".join(flags),
