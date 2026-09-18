@@ -85,10 +85,13 @@ service running each command to completion.
 most likely to be assumed rather than verified: a platform's built-in
 monitoring commonly reports whether the container or service is *healthy*, not
 whether an individual scheduled run *exited non-zero*. A weekly job that fails
-every week can leave every dashboard green. Section 13 asks you to make a
-failed run visible to a person; if your platform's alerting stops at
-healthiness, that visibility is something you still have to build — the run's
-exit code is what you have to route somewhere.
+every week can leave every dashboard green — and a weekly job that stops being
+triggered at all exits nothing for your platform to notice.
+
+**Section 13's "Making a failed run visible" is what to build**: check that
+`last_run.json` carries the week you expected, rather than routing an exit code.
+Read it before writing anything here, including its note on `OUTPUT_DIR`, which
+in this document's second model does not survive the run.
 
 ## Postgres on a shared instance
 

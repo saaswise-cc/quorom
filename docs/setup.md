@@ -1030,7 +1030,38 @@ paragraph below.
 **A failed run does not currently retry.** Connection errors are not retried,
 deliberately: what should happen when a run fails is a decision about your
 schedule, not about the code. Decide it when you decide the runner, and make
-sure a failure is visible to a person.
+sure a failure is visible to a person. The rest of this section is how.
+
+### Making a failed run visible
+
+A run that fails loudly is the easy case. The one to design for is the run that
+stops happening — no file, no error, no exit code, and nobody watching a
+schedule they assume is working. So the check has to be something that goes
+stale on its own.
+
+`quorom weekly` writes `last_run.json` last, after everything else. Its presence
+means the run finished. So the check is: **is there a manifest for the week I
+expected?** One check, no new code, and it catches the job never starting.
+
+**Check the `week_start` value, not the file.** A failed run leaves the previous
+run's manifest sitting in place, so "the file is there" stays true forever.
+
+What counts as healthy depends on which schedule you chose above:
+
+| Your schedule | Healthy `week_start` |
+|---|---|
+| Friday or Saturday, no `WEEK_START` | the Monday of the week you are in |
+| After the week closes, `WEEK_START` set | the Monday you set — the previous week |
+
+They differ by exactly one week. Check against the wrong row and a working
+deployment reports a failure every time.
+
+**If your platform tears the container down after each run** — the second model
+in `docs/paas-deployment.md` — `OUTPUT_DIR` goes with it and there is no
+manifest to find. Put it on a volume that persists, or have the run report
+somewhere that does.
+
+Whatever runs the check, make sure its result reaches a person.
 
 ---
 
