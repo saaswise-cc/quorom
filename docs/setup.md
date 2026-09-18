@@ -1238,6 +1238,19 @@ Upstream moves. You take updates by moving to a newer upstream commit or tag —
 `git pull`, or whatever your pipeline does to fetch the code — and re-running
 any new migrations. Nothing else, because nothing else is yours.
 
+**If your deployment pins a commit, nothing upstream reaches you until someone
+changes the pin.** That is the point of pinning and it is the right default —
+but it means "upstream added X" and "this deployment has X" are two different
+statements, and the gap between them is however long since the last bump. A
+deployment that pins is a deployment where somebody has to decide to update.
+
+The failure this produces is worth recognising, because it does not look like a
+version problem: something you read about in these docs is simply *not there* —
+a file the run was supposed to write, a flag the CLI does not accept, a column
+that never appears. Check what your deployment is pinned to before concluding
+anything is broken. One real deployment spent a debugging session on a manifest
+file that had landed upstream a week after the commit it was pinned to.
+
 If a new migration is added it will be `0005_` or later; apply the ones you have
 not applied, in filename order.
 

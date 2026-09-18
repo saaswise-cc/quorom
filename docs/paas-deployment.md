@@ -119,3 +119,17 @@ that looks exactly like the first, with nothing to catch it. Re-running is a
 normal thing to do here — importing is idempotent by design, so nothing else in
 the pipeline discourages it — which makes your storage the one place that
 notices, or doesn't.
+
+**And grant `UPDATE` when you do.** Postgres requires the `UPDATE` privilege for
+the conflict clause specifically, separately from `INSERT` — so a role granted
+`INSERT, SELECT`, which is what §14 tells you to grant, fails on
+`ON CONFLICT … DO UPDATE` with a bare `permission denied`. The error names the
+table, not the clause, and it arrives at the end of a run after all the work is
+done. One real deployment lost a run to exactly this.
+
+**It is a trade, not a detail.** §14 grants `INSERT, SELECT` and withholds
+`UPDATE` deliberately: that is what makes the history append-only by privilege
+rather than by good intentions, and it is why the pipeline's own retention uses
+a plain `INSERT` and treats a re-run as a second row that really happened.
+Adding `UPDATE` so a re-run overwrites in place is a reasonable choice — it is
+just a different one, and worth making on purpose. Withhold `DELETE` either way.
