@@ -195,7 +195,12 @@ def build(
                     "linkedin": (
                         NOT_AVAILABLE if person.linkedin is None else person.linkedin
                     ),
-                    "mobile": "yes" if person.mobile else "GAP",
+                    # "no", not "GAP". The column is a plain yes/no about what
+                    # the CRM holds, and a missing mobile number is a fact about
+                    # a contact record rather than something wrong with it.
+                    # "GAP" read as a defect, in red, on rows where nothing was
+                    # defective.
+                    "mobile": "yes" if person.mobile else "no",
                     "_seniority": seniority_rank(person.title),
                     "_recent": contact.startswith("yes"),
                     "_email": email,

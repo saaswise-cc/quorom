@@ -59,6 +59,27 @@ SECTIONS = [
 ]
 
 
+# A CRM holds LinkedIn profiles in whatever shape whoever typed them used:
+# `https://www.linkedin.com/in/x`, `www.linkedin.com/in/x`, `linkedin.com/in/x`,
+# with or without a trailing slash or a query string. Matching only on a
+# leading "http" meant a `www.`-prefixed value was neither linked nor shortened
+# — so it rendered as raw text and then hit the column's ellipsis, arriving as
+# a truncated string a reader can neither click nor copy. The handle is what
+# identifies the profile; everything else is reconstructible.
+LINKEDIN = re.compile(
+    r"^(?:https?://)?(?:[\w-]+\.)*linkedin\.com/in/(?P<handle>[^/?#\s]+)", re.I
+)
+
+
+def _linkedin(value: str) -> str:
+    """A short, clickable profile link, or "" if this is not a LinkedIn URL."""
+    match = LINKEDIN.match(value.strip())
+    if not match:
+        return ""
+    handle = html.escape(match.group("handle"))
+    return f'<a href="https://www.linkedin.com/in/{handle}">{handle}</a>'
+
+
 def cell(col: str, value: str) -> tuple[str, str]:
     """(css class, inner html) for one cell, mirroring the workbook's emphasis."""
     v = html.escape(value)
@@ -76,7 +97,11 @@ def cell(col: str, value: str) -> tuple[str, str]:
         return "na", v
     if col == "Meets profile?":
         return ("ok", v) if v == "yes" else ("rej", v)
-    if v in ("NO", "GAP"):
+    # Reserved for a real finding. "no mobile on file" used to land here as
+    # "GAP" and is now a plain "no" — it is a fact about a contact record, not
+    # a defect in one, and colouring it made a page of ordinary rows read as a
+    # page of problems.
+    if v == "NO":
         return "", f'<span class="no">{v}</span>'
     if col == "Recent contact?":
         return ("", v) if v.startswith("yes") else ("", f'<span class="fl">{v}</span>')
@@ -84,9 +109,11 @@ def cell(col: str, value: str) -> tuple[str, str]:
         return "", f'<span class="fl">{v}</span>'
     if col == "Name" and v.startswith("—"):
         return "rej", v  # explicit gap row: no senior contact in the CRM
+    profile = _linkedin(value)
+    if profile:
+        return "", profile
     if v.startswith("http"):
-        short = re.sub(r"^https?://(www\.)?linkedin\.com/in/", "", v).rstrip("/")
-        return "", f'<a href="{v}">{html.escape(short)}</a>'
+        return "", f'<a href="{v}">{v}</a>'
     return "", v
 
 
@@ -142,9 +169,9 @@ def render(workbook_path: str, account: str) -> str:
             f"<title>Weekly Stakeholder Map — {label} — week of {week}</title>"
             f"<style>{CSS}</style></head><body>"
             f"<h1>Weekly Stakeholder Map — {label} · week of {week}</h1>"
-            f'<div class="meta">Rendered from '
-            f"{html.escape(os.path.basename(workbook_path))}. Contains contact data "
-            "from the CRM — local file, not for publishing.</div>"
+            f'<div class="meta">The same data as '
+            f"{html.escape(os.path.basename(workbook_path))}, in one page. "
+            "Contains contact data from the CRM — not for publishing.</div>"
             f"{''.join(parts)}</body></html>"
         )
     return out_path

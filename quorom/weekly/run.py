@@ -232,7 +232,14 @@ def run_weekly(cfg: Config, log=print) -> dict:
     # Step 6 — emit
     week = start[:10]
     xlsx_path = os.path.join(cfg.output_dir, f"weekly_stakeholder_map_{week}.xlsx")
-    workbook_mod.build_workbook(cfg, reconciled, coverage, suppressed, stakeholders, xlsx_path)
+    workbook_mod.build_workbook(
+        cfg, reconciled, coverage, suppressed, stakeholders, xlsx_path,
+        # The ICP test states itself on tab 3 in the reader's own numbers, so
+        # the profile and the geography label it was parsed into both have to
+        # reach the workbook rather than being described in the abstract.
+        profile=profile,
+        geo_label=geography.prose_label(selections),
+    )
     log(f"[✓] Wrote {xlsx_path}")
 
     json_path = os.path.join(cfg.output_dir, f"stakeholder_inputs_{week}.json")

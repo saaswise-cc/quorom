@@ -177,6 +177,40 @@ def test_salesforce_still_wins_on_title():
     assert "title differs (SF: VP Sales / HS: Head of Sales)" in got["flag"]
 
 
+def test_a_name_the_crm_holds_is_not_reported_missing():
+    """The meeting source frequently has an address and no name for an attendee
+    the CRM knows by name. The row already takes its *title* from that record,
+    so reporting "needs name" beside it was the run calling something missing
+    that it had in hand — and the same person appeared blank on tab 1 while
+    correctly named on tab 4."""
+    from quorom.weekly.people import reconcile
+
+    got = reconcile(
+        {"email": "m@acme.com", "attendee_name": "", "flag": "needs enrichment"},
+        _Stub(Contact(name="Martina Taverna", title="VP Sales")),
+        _Stub(None),
+    )
+
+    assert got["attendee_name"] == "Martina Taverna"
+    assert "needs name" not in got["flag"]
+
+    # Salesforce wins, HubSpot is the fallback — the same precedence as title.
+    either = reconcile(
+        {"email": "m@acme.com", "attendee_name": "", "flag": ""},
+        _Stub(None),
+        _Stub(Contact(name="From HubSpot")),
+    )
+    assert either["attendee_name"] == "From HubSpot"
+
+    # And a name nobody has is still reported missing.
+    nowhere = reconcile(
+        {"email": "m@acme.com", "attendee_name": "", "flag": ""},
+        _Stub(None),
+        _Stub(None),
+    )
+    assert "needs name" in nowhere["flag"]
+
+
 @pytest.mark.parametrize(
     "sf_mobile, hs_mobile, expected",
     [(True, False, True), (False, True, True), (False, False, False)],
@@ -219,7 +253,8 @@ def test_the_stakeholder_row_is_built_from_the_contact(tmp_path):
     assert rows[0]["mobile"] == "yes"
     assert rows[0]["linkedin"] == "https://li/dana"
     assert rows[0]["_email"] == "dana@acme.com"            # lowercased for the join
-    assert rows[1]["mobile"] == "GAP"
+    # "no", not "GAP" — a plain fact about the contact record, not a defect.
+    assert rows[1]["mobile"] == "no"
     assert rows[1]["linkedin"] == NOT_AVAILABLE            # no such field here
     # The dump carries what the CRM returned, untouched by this layer.
     assert raw[0]["bench"] == [{"raw": 1}, {}]

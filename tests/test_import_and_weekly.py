@@ -177,6 +177,54 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     assert "not for publishing" in html
 
 
+@pytest.mark.parametrize(
+    "name, email, expected",
+    [
+        # A role inbox is a role inbox whether or not a name came with it. The
+        # meeting source labels `amer-bdr@` as "AMER BDR", and a real person's
+        # name can sit on a shared `jobs@` address — treating the name as proof
+        # of a person meant neither was ever flagged, and the Flag column on
+        # tab 2 was empty for every row as a result.
+        ("Fabio Andres Betancur", "jobs@example.com", "shared inbox — verify"),
+        (None, "support@example.com", "shared inbox — verify"),
+        # A person keeps their name, and a nameless one still needs enriching.
+        ("Dana Reyes", "dana@example.com", ""),
+        (None, "dana@example.com", "needs enrichment"),
+        (None, None, "needs enrichment"),
+    ],
+)
+def test_a_role_inbox_is_flagged_even_when_it_has_a_name(name, email, expected):
+    from quorom.weekly.people import person_flag
+
+    assert person_flag(name, email) == expected
+
+
+def test_the_icp_test_states_itself_in_the_readers_numbers(
+    database, gong_calls, tmp_path
+):
+    """Tab 3's caption used to name "your focus profile" — a term the reader of
+    the file has never met — and then decline to say what was in it. Someone
+    looking at a column of yes and no has no other way to learn what the test
+    was."""
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
+    ws = load_workbook(paths["xlsx"])["3 - Company coverage"]
+    caption = " ".join(
+        str(r[0]) for r in ws.iter_rows(min_row=2, values_only=True)
+        if r[0] and str(r[0]).startswith("Meets profile?")
+    )
+
+    # The seeded profile's own values, not a description of where they live.
+    assert "200–10,000 employees" in caption
+    # Written out, not the "NA" shorthand the narrow HQ column uses: the reader
+    # of this caption has no column context to decode it from.
+    assert "HQ in North America" in caption
+    assert "focus profile" not in caption
+
+
 def test_a_week_that_has_not_finished_says_so(database, gong_calls, tmp_path):
     """The failure this catches is silent, which is why it is a log line rather
     than a column: a run whose window has not closed completes cleanly and
@@ -209,6 +257,29 @@ def test_a_week_that_has_not_finished_says_so(database, gong_calls, tmp_path):
 
     # And it is a warning, not a refusal — the run still produced its files.
     assert (tmp_path / "last_run.json").exists()
+
+
+@pytest.mark.parametrize(
+    "stored, handle",
+    [
+        ("https://www.linkedin.com/in/gregory-sherman-b91", "gregory-sherman-b91"),
+        # The shape that broke it: no scheme, so the old check ("starts with
+        # http") neither linked it nor shortened it — leaving a long raw string
+        # that the column's ellipsis then truncated into something a reader can
+        # neither click nor copy.
+        ("www.linkedin.com/in/gregory-sherman-b91", "gregory-sherman-b91"),
+        ("linkedin.com/in/brigreene", "brigreene"),
+        ("https://linkedin.com/in/dana/", "dana"),
+        ("https://uk.linkedin.com/in/someone?trk=x", "someone"),
+    ],
+)
+def test_a_linkedin_profile_renders_short_and_clickable(stored, handle):
+    from quorom.weekly.view import cell
+
+    _, rendered = cell("LinkedIn", stored)
+    assert rendered == (
+        f'<a href="https://www.linkedin.com/in/{handle}">{handle}</a>'
+    )
 
 
 def test_tab_1_states_what_was_never_asked(database, gong_calls, tmp_path):
@@ -473,8 +544,8 @@ def test_tabs_2_and_3_omit_a_crm_that_was_never_queried(database, gong_calls, tm
     "hs_on, sf_on, crm_columns, source",
     [
         (True, True, ["In HubSpot?", "In Salesforce?"], "hubspot/salesforce"),
-        (True, False, ["In HubSpot?"], "hubspot"),
-        (False, True, ["In Salesforce?"], "salesforce"),
+        (True, False, [], "hubspot"),
+        (False, True, [], "salesforce"),
         (False, False, [], ""),
     ],
 )
@@ -483,8 +554,13 @@ def test_workbook_columns_follow_the_crms_configured(
 ):
     """Both columns survive when both CRMs are on — "in HubSpot but not
     Salesforce" is the actionable answer and merging them into one "In CRM?"
-    would lose it. Only the unconfigured one is dropped, and Source names
-    exactly what was queried.
+    would lose it. Source always names exactly what was queried.
+
+    **With only one CRM configured, neither column is rendered.** Every row on
+    this tab is here because it is missing from a CRM, so a single CRM's column
+    is the word NO repeated down the page, restating the sheet's own title. This
+    supersedes the earlier expectation that the configured one survived alone —
+    a real deployment running one CRM read it as a redundant column, and it was.
 
     A unit test rather than an end-to-end one: configuring a CRM leg here would
     make the run reach for the real API. The credentials below are literals, so
@@ -526,7 +602,11 @@ def test_workbook_columns_follow_the_crms_configured(
     ]
 
     out = str(tmp_path / "wb.xlsx")
-    build_workbook(cfg, reconciled, coverage, [], [], out)
+    build_workbook(
+        cfg, reconciled, coverage, [], [], out,
+        profile={"employee_count_min": 50, "employee_count_max": 500},
+        geo_label="United States/Canada",
+    )
     wb = load_workbook(out)
 
     ws2 = wb["2 - Missing from CRM"]
@@ -543,7 +623,7 @@ def test_workbook_columns_follow_the_crms_configured(
     )
 
     rows = [r for r in ws2.iter_rows(min_row=2, values_only=True) if r[0]]
-    if not crm_columns:
+    if not (hs_on or sf_on):
         # Nothing can be missing from a CRM that was never consulted.
         assert rows == []
         return

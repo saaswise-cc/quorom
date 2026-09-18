@@ -186,6 +186,28 @@ def label(selections: list[dict]) -> str:
     return "/".join(parts) or "anywhere"
 
 
+def prose_label(selections: list[dict]) -> str:
+    """The same selections written out, for a sentence rather than a cell.
+
+    `label` is built for a narrow column, where "NA" is a reasonable compression
+    a reader decodes from context. A caption explaining what the ICP test was
+    has no such context — it is read by whoever received the file, who has no
+    reason to know the shorthand — and a caption that needs decoding is the
+    thing that caption exists to stop.
+    """
+    parts = []
+    for sel in selections:
+        if sel["level"] == "region":
+            parts.append(sel["value"].title())
+        else:
+            parts.append(sel["value"].title())
+    if not parts:
+        return "anywhere"
+    if len(parts) == 1:
+        return parts[0]
+    return ", ".join(parts[:-1]) + " or " + parts[-1]
+
+
 def matches(selections: list[dict], country: Any) -> bool:
     """Is this company's HQ country inside any selection?
 

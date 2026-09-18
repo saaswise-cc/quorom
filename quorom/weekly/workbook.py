@@ -45,12 +45,16 @@ def _linkedin_cell(value) -> str:
 
 
 def _mobile_cell(value) -> str:
-    """`GAP` is a finding about a CRM that was asked. With none configured there
-    is nothing to have a gap in, so the cell says so rather than flagging every
-    row red against a system that was never called."""
+    """A plain yes/no about what the CRM holds, plus "not checked" when no CRM
+    was asked at all.
+
+    This used to read "GAP", in red. The column is a fact about a contact
+    record, not a defect in one, and a page of red against rows where nothing
+    was wrong made the whole artifact read as broken.
+    """
     if value == NOT_CHECKED:
         return NOT_CHECKED
-    return "yes" if value else "GAP"
+    return "yes" if value else "no"
 
 
 def _crms_queried(cfg: Config) -> list[str]:
@@ -69,6 +73,28 @@ def _crms_queried(cfg: Config) -> list[str]:
     return names
 
 
+def _profile_sentence(profile: dict, geo_label: str) -> str:
+    """The ICP test in the reader's words, using their own numbers.
+
+    This used to read "the employee band and HQ geography from your focus
+    profile", which names a concept the reader of the file has never heard of
+    and then declines to say what it contains. The run holds the values; a
+    reader looking at a column of yes and no needs to know what the test was,
+    and nothing else on the page tells them.
+    """
+    lo = profile.get("employee_count_min")
+    hi = profile.get("employee_count_max")
+    if lo and hi:
+        band = f"{lo:,}–{hi:,} employees"
+    elif lo:
+        band = f"{lo:,}+ employees"
+    elif hi:
+        band = f"up to {hi:,} employees"
+    else:
+        band = "any size"
+    return f"Meets profile? = {band}, HQ in {geo_label}."
+
+
 def build_workbook(
     cfg: Config,
     reconciled: list[dict],
@@ -76,6 +102,8 @@ def build_workbook(
     suppressed: list[str],
     stakeholders: list[dict],
     out_path: str,
+    profile: dict,
+    geo_label: str,
 ) -> None:
     wb = Workbook()
     wb.remove(wb.active)
@@ -119,19 +147,23 @@ def build_workbook(
     # Tab 2 — Missing from CRM
     #
     # A CRM that was not configured was not queried, so it gets no column at
-    # all rather than a column of "not checked". Both are kept when both are
-    # configured: which of the two holds the person is the point of this tab —
-    # "in HubSpot but not Salesforce" is actionable, and a single merged
-    # "In CRM?" would throw that away for anyone running both.
+    # all rather than a column of "not checked".
+    #
+    # **And with only one configured, neither does it.** Every row on this tab
+    # is here *because* it is missing from a CRM, so with a single CRM the
+    # column is the word NO repeated down the page — the sheet's own title
+    # already said it. The columns earn their place only when both are on,
+    # which is the case they exist for: "in HubSpot but not Salesforce" is
+    # actionable, and a single merged "In CRM?" would throw that away.
     hs_on = cfg.hubspot.configured
     sf_on = cfg.salesforce.configured
+    both_crms = hs_on and sf_on
     source = "/".join(_crms_queried(cfg))
     ws2 = _sheet(
         wb,
         "2 - Missing from CRM",
         ["Name", "Email", "Company (domain)"]
-        + (["In HubSpot?"] if hs_on else [])
-        + (["In Salesforce?"] if sf_on else [])
+        + (["In HubSpot?", "In Salesforce?"] if both_crms else [])
         + ["Flag", "Source"],
     )
     for r in reconciled:
@@ -145,10 +177,8 @@ def build_workbook(
             # "needs name/title" is redundant in a gap report — the row IS the gap.
             flag = flag if "shared inbox" in flag else ""
             row = [r.get("attendee_name"), r.get("email", ""), r.get("domain")]
-            if hs_on:
-                row.append("yes" if in_hs else "NO")
-            if sf_on:
-                row.append("yes" if in_sf else "NO")
+            if both_crms:
+                row += ["yes" if in_hs else "NO", "yes" if in_sf else "NO"]
             ws2.append(row + [flag, source])
     if suppressed:
         ws2.append([])
@@ -187,8 +217,10 @@ def build_workbook(
     ws3.append([])
     ws3.append(
         [
-            "Meets profile? = the employee band and HQ geography from your focus "
-            "profile. Account type is shown for context and is not used to filter."
+            _profile_sentence(profile, geo_label)
+            + " A company with no employee count on file is excluded rather than"
+            " given the benefit of the doubt. Account type is shown for context"
+            " and is not used to filter."
         ]
     )
 

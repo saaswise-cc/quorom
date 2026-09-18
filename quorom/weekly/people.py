@@ -28,14 +28,22 @@ ROLE_LOCALPARTS = frozenset(
 
 
 def person_flag(name: Optional[str], email: Optional[str]) -> str:
-    """Name-less rows are PEOPLE, not noise — they need their identity filled in."""
+    """Name-less rows are PEOPLE, not noise — they need their identity filled in.
+
+    The address is checked first, and regardless of whether a name came with it.
+    A role inbox frequently arrives named — a meeting source will happily label
+    `amer-bdr@` as "AMER BDR", and a real person's name can sit on a shared
+    `jobs@` address — and treating a name as proof of a person meant the
+    shared-inbox flag never fired for either. "Is this someone to add to the
+    CRM" is the question tab 2 exists to answer, so getting it wrong there is
+    the whole column being wrong.
+    """
+    if email:
+        tokens = re.split(r"[._-]", email.split("@", 1)[0].lower())
+        if any(t in ROLE_LOCALPARTS for t in tokens):
+            return "shared inbox — verify"
     if name and name.strip():
         return ""
-    if not email:
-        return "needs enrichment"
-    tokens = re.split(r"[._-]", email.split("@", 1)[0].lower())
-    if any(t in ROLE_LOCALPARTS for t in tokens):
-        return "shared inbox — verify"
     return "needs enrichment"
 
 
@@ -157,13 +165,21 @@ def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
     hs_title = hs_rec.title if hs_rec else ""
     title = sf_title or hs_title
 
+    # The meeting source often has no name for an attendee it has an address
+    # for, while the CRM record this function just fetched has one. Taking the
+    # title from that record and not the name reported "needs name" for people
+    # the run had already looked up and could see — the same person appearing
+    # blank on tab 1 and correctly named on tab 4. Salesforce wins, HubSpot is
+    # the fallback, same precedence as the title beside it.
+    crm_name = (sf_rec.name if sf_rec else "") or (hs_rec.name if hs_rec else "")
+    name = person.get("attendee_name") or crm_name
+
     flags: list[str] = []
     base = person.get("flag", "")
     if base == "shared inbox — verify":
         flags.append(base)  # a role inbox is not a person to enrich
     else:
         missing = []
-        name = person.get("attendee_name")
         if not (name and str(name).strip()):
             missing.append("name")
         # A missing title is only a finding if a CRM was asked for one. With no
@@ -183,6 +199,7 @@ def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
 
     return {
         **person,
+        "attendee_name": name,
         "in_hubspot": bool(hs_rec) if hs.configured else None,
         # None means not checked — never conflated with "not found".
         "in_salesforce": bool(sf_rec) if sf.configured else None,
