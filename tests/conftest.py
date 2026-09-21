@@ -49,6 +49,13 @@ def no_developer_credentials(monkeypatch):
     """
     for name in CREDENTIAL_VARS:
         monkeypatch.delenv(name, raising=False)
+    # Enrichment providers, asked for their own variable names rather than
+    # listed here — so a provider added later is cleared too, and this file
+    # never has to name one. With none set, a weekly run makes no provider call.
+    from quorom import enrich
+
+    for name in enrich.env_vars():
+        monkeypatch.delenv(name, raising=False)
     for name in [k for k in os.environ if k.startswith(CREDENTIAL_PREFIXES)]:
         monkeypatch.delenv(name, raising=False)
 

@@ -108,14 +108,26 @@ ICP_NOT_ASSESSED = "— ICP not assessed: no CRM configured —"
 
 
 def companies_for_map(coverage: list[dict]) -> list[dict]:
-    """The companies tab 4 shows: confirmed targets, plus every company whose
-    ICP test could not run.
+    """The companies tab 4 shows: confirmed targets, every company whose ICP
+    test could not run, and every company whose verdict an enrichment provider
+    disputes.
 
     The second half is the whole point. `is_target` is False for an unassessed
     company exactly as it is for a rejected one, so filtering on it alone drops
     a company out of the map because data nobody fetched did not clear a bar.
+
+    The third is the same argument with a second source. A wrong "no" is
+    invisible — the company never reaches the map and nobody looks — so a
+    company the CRM rejects and the provider would accept goes on, marked as
+    disputed, for a person to settle. An existing customer stays off either way.
+    `disputed` is only ever set by the enrichment pass.
     """
-    return [c for c in coverage if c.get("is_target") or not c.get("assessed", True)]
+    return [
+        c for c in coverage
+        if c.get("is_target")
+        or not c.get("assessed", True)
+        or (c.get("disputed") and not c.get("is_customer"))
+    ]
 
 
 def build(
@@ -139,6 +151,7 @@ def build(
                 {
                     "domain": company["domain"],
                     "company": company.get("name") or company["domain"],
+                    "disputed": bool(company.get("disputed")),
                     "name": ICP_NOT_ASSESSED,
                     "title": "",
                     "contact": "",
@@ -172,6 +185,7 @@ def build(
                 {
                     "domain": company["domain"],
                     "company": company.get("name") or company["domain"],
+                    "disputed": bool(company.get("disputed")),
                     "name": NO_SENIOR_CONTACT,
                     "title": "",
                     "contact": "",
@@ -189,6 +203,7 @@ def build(
                 {
                     "domain": company["domain"],
                     "company": company.get("name") or company["domain"],
+                    "disputed": bool(company.get("disputed")),
                     "name": person.name,
                     "title": clean_title(person.title),
                     "contact": contact,

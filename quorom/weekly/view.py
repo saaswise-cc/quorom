@@ -50,6 +50,9 @@ a{color:inherit;text-decoration:none;border-bottom:1px dotted #999}
 SECTIONS = [
     ("3 - Company coverage", "Company coverage"),
     ("4 - Stakeholder list", "Stakeholder list"),
+    # Present only when an enrichment provider is configured; skipped otherwise
+    # by the `in wb.sheetnames` test in render().
+    ("5 - Review queue", "Review queue"),
     # "Not in CRM", not "Not in HubSpot or Salesforce": the heading must not
     # name a system this run never called, and the sheet it renames is already
     # correctly titled. A vendor name in customer-facing output is the same
@@ -122,6 +125,12 @@ def cell(col: str, value: str) -> tuple[str, str]:
     if col == "Recent contact?":
         return ("", v) if v.startswith("yes") else ("", f'<span class="fl">{v}</span>')
     if col == "Flag":
+        return "", f'<span class="fl">{v}</span>'
+    # A second source disagreeing is a finding for a person, so it takes the
+    # same emphasis as a Flag. Agreement and "yes" stay plain.
+    if col == "Profile check" and v.startswith("disputed"):
+        return "", f'<span class="fl">{v}</span>'
+    if col == "Still at company?" and (v.startswith("no —") or v.startswith("unclear")):
         return "", f'<span class="fl">{v}</span>'
     if col == "Name" and v.startswith("—"):
         return "rej", v  # explicit gap row: no senior contact in the CRM

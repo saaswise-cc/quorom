@@ -1,6 +1,7 @@
 # The pipeline
 
-Six steps. Each one names the read path it serves — the column, tab or filter in
+Six steps, and one optional pass (5b, enrichment) that runs only when a
+provider is configured. Each one names the read path it serves — the column, tab or filter in
 the stakeholder-map artifact that would be wrong or absent without it. A step
 with no read path named is a step that should not exist.
 
@@ -19,8 +20,11 @@ quorom/gong/                client.py · importer.py · identity.py      (step 0
 quorom/crm/                 salesforce.py · hubspot.py                 (steps 3-5)
                             fieldmap.py — the resolved field map      (step 0b)
                             contact.py — what an adapter hands back
+quorom/enrich/              one module per enrichment provider, found by
+                            the package rather than imported by name  (5b)
 quorom/weekly/              people.py (1-3) · coverage.py (4) ·
-                            stakeholders.py (5) · workbook.py + view.py (6) ·
+                            stakeholders.py (5) · enrichment.py (5b) ·
+                            workbook.py + view.py (6) ·
                             run.py — the sequence, and nothing else
 quorom/cli.py               quorom init · resolve-fields · import · weekly
 ```
@@ -332,23 +336,58 @@ the code doing it for them.
 message, maybe meeting request — is undecided, so the artifact says who is worth
 considering and stops.
 
-**Not run here:** net-new discovery through an enrichment provider. It is not
-part of the weekly file today. When it is added, the provider rule has teeth: an
-unresolved person becomes an explicit "not found in &lt;provider&gt;" row, never
-filled from elsewhere and never dropped.
+**Not run here:** net-new discovery — finding senior people at a company who are
+not in the CRM. The enrichment pass (5b) checks the people already on the map;
+it does not find new ones.
 
-**Not checked here:** whether each person is still at the company. The column is
-absent rather than saying `not checked` on every row. An enrichment provider
-could answer it; none is wired up.
+**Not checked here:** whether each person is still at the company. Without an
+enrichment provider the column is absent rather than saying `not checked` on
+every row; with one, step 5b answers it.
+
+---
+
+## Step 5b — Enrichment (optional)
+
+Runs only when an enrichment provider is configured; with none, nothing in this
+section happens and the output is as the steps above describe. Full detail,
+including the provider's name, its variable and its cost, in
+`docs/enrichment.md`.
+
+**Reads:** the provider — a company lookup per domain on tab 3, and a person
+lookup per email on tab 4 and on tab 2 (shared inboxes excepted). One lookup per
+email and per domain per run. Never a phone number or a personal email.
+**Cost:** the provider's credits, per `docs/enrichment.md`.
+
+**Read path served:** tab 2 `Name (…)` and `Title (…)`; tab 3 `Employees (…)`,
+`HQ (…)` and `Profile check`; tab 4 `Still at company?`, `Title (…)` and
+`LinkedIn (…)`; **tab 5 (Review queue)**; and which companies reach tab 4 — a
+company whose ICP verdict the provider disputes goes on, marked
+`(profile disputed)`, because a wrong "no" otherwise removes a company from the
+map without trace. The `(…)` is the provider's display name.
+
+**Order within the run.** The provider's free account check runs first of all,
+before the database or a CRM is touched. The company half runs after step 4 and
+before the map's companies are chosen, since a dispute changes that choice. The
+person half runs after step 5.
+
+Three rules shape the output. **A provider value is never written over a CRM
+value** — it is shown beside it, and a disagreement becomes a review-queue row.
+**A result is accepted only if it is the person or company asked about** — the
+searched email on the record, the searched domain on the company — because a
+lookup can return someone else at full confidence. **A miss is stated**, as
+`not found in <provider>`: never inferred, never blank, never filled from
+another source.
 
 ---
 
 ## Step 6 — Emit
 
-**Writes:** a local `.xlsx` (four tabs, provenance per row) and a JSON dump of
-every input — focus profile, seniority terms, observed `Account.Type` values,
-coverage, meeting history, the SF bench, the shortlist, and the `Contact`
-describe.
+**Writes:** a local `.xlsx` (four tabs, provenance per row; a fifth, the review
+queue, with an enrichment provider) and a JSON dump of every input — focus
+profile, seniority terms, observed `Account.Type` values, coverage, meeting
+history, the SF bench, the shortlist, the `Contact` describe, and with a
+provider its values on each coverage and shortlist row, its name, and the
+review queue.
 
 **Read path served:** the artifact itself; and the JSON is what lets the ranking
 be re-tuned without re-running Salesforce.
@@ -389,7 +428,9 @@ which is how the unconfigured-provider path stays honest rather than
 degrading into "NO" or into a count of 0. The one-CRM configurations
 (Salesforce only, HubSpot only) and the both-configured one run separately,
 from reconciliation to the HTML view, against stubbed CRM adapters: they assert
-that nothing comparing two CRMs appears unless both are configured. The CRM
+that nothing comparing two CRMs appears unless both are configured. Enrichment
+is covered the same way, off and on, against a stubbed provider — including a
+lookup that returns someone other than the person asked about. The CRM
 legs themselves are typically unreachable from an agent session and have to be
 verified on a machine that can reach them, by diffing a workbook against a
 known-good run for the same week. Point `QUOROM_TEST_DSN` at a Postgres a test

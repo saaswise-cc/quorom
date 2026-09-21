@@ -1,4 +1,5 @@
-"""Step 6 — emit. Four tabs, provenance on every row.
+"""Step 6 — emit. Four tabs, and a fifth when an enrichment provider is
+configured.
 
 Nothing is written back to any system. The workbook and the JSON dump are the
 only outputs, and the dump redacts MobilePhone to a boolean: sensitive contact
@@ -9,12 +10,14 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Optional
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 from ..config import Config
 from ..crm.fieldmap import NOT_AVAILABLE, NOT_CHECKED
+from .people import missing_from_crm
 from .stakeholders import NO_SENIOR_CONTACT
 
 HEADER_FILL = "2F5B7C"
@@ -109,7 +112,16 @@ def build_workbook(
     out_path: str,
     profile: dict,
     geo_label: str,
+    enrichment: Optional[str] = None,
+    queue: Optional[list[dict]] = None,
 ) -> None:
+    """`enrichment` is the configured provider's display name, or None.
+
+    None is the default and changes nothing: no provider column, no tab 5. The
+    same rule as a CRM that is not configured — an absent source contributes no
+    column, rather than a column saying it was not asked.
+    """
+    other = enrichment
     wb = Workbook()
     wb.remove(wb.active)
 
@@ -171,6 +183,7 @@ def build_workbook(
         "2 - Missing from CRM",
         ["Name", "Email", "Company (domain)"]
         + (["In HubSpot?", "In Salesforce?"] if both_crms else [])
+        + ([f"Name ({other})", f"Title ({other})"] if other else [])
         + ["Flag"],
     )
     for r in reconciled:
@@ -179,13 +192,15 @@ def build_workbook(
         # None is "not checked", and only ever arises for a CRM that is
         # unconfigured — whose column is not rendered. So a rendered cell is
         # always a real yes/no, and "not checked" never reaches this tab.
-        if in_hs is False or in_sf is False:
+        if missing_from_crm(r):
             flag = r.get("flag", "")
             # "needs name/title" is redundant in a gap report — the row IS the gap.
             flag = flag if "shared inbox" in flag else ""
             row = [r.get("attendee_name"), r.get("email", ""), r.get("domain")]
             if both_crms:
                 row += ["yes" if in_hs else "NO", "yes" if in_sf else "NO"]
+            if other:
+                row += [r.get("other_name", ""), r.get("other_title", "")]
             ws2.append(row + [flag])
     checked = _checked_against(cfg)
     if checked or suppressed:
@@ -213,7 +228,11 @@ def build_workbook(
         ["Company", "Company name", "Employees", "HQ", "Account type",
          "Meets profile?", "Met this wk"]
         + (["SF contacts", "SF focus-senior"] if sf_on else [])
-        + (["HubSpot contacts"] if hs_on else []),
+        + (["HubSpot contacts"] if hs_on else [])
+        # Numeric, like the count columns: a company the provider does not know
+        # is blank here and says so in Profile check, rather than putting text
+        # into a column that has to stay sortable.
+        + ([f"Employees ({other})", f"HQ ({other})", "Profile check"] if other else []),
     )
     for c in sorted(coverage, key=lambda x: (not x.get("is_target"), -x.get("met", 0))):
         row = [
@@ -224,6 +243,8 @@ def build_workbook(
             row += [c.get("sf_total", 0), c.get("sf_senior", 0)]
         if hs_on:
             row.append(c.get("hs_total", 0))
+        if other:
+            row += [c.get("other_employees"), c.get("other_hq", ""), c.get("verdict_check", "")]
         ws3.append(row)
     ws3.append([])
     ws3.append(
@@ -234,18 +255,32 @@ def build_workbook(
             " and is not used to filter."
         ]
     )
+    if other:
+        ws3.append(
+            [
+                f"The {other} columns are a second opinion, not a correction — {other} can "
+                "be out of date too. Profile check runs the same test on its numbers; "
+                "a disputed company is on the stakeholder list, marked, and in the review "
+                "queue."
+            ]
+        )
 
     # Tab 4 — Stakeholder list (the map)
     ws4 = _sheet(
         wb,
         "4 - Stakeholder list",
-        ["Company", "Name", "Title", "Recent contact?", "LinkedIn", "Mobile in CRM?"],
+        ["Company", "Name", "Title", "Recent contact?", "LinkedIn", "Mobile in CRM?"]
+        + (["Still at company?", f"Title ({other})", f"LinkedIn ({other})"] if other else []),
     )
     for r in stakeholders:
-        ws4.append(
-            [r.get("company", ""), r.get("name", ""), r.get("title", ""),
-             r.get("contact", ""), r.get("linkedin", ""), r.get("mobile", "")]
-        )
+        company = r.get("company", "")
+        if r.get("disputed"):
+            company = f"{company} (profile disputed)"
+        row = [company, r.get("name", ""), r.get("title", ""),
+               r.get("contact", ""), r.get("linkedin", ""), r.get("mobile", "")]
+        if other:
+            row += [r.get("still_at", ""), r.get("other_title", ""), r.get("other_linkedin", "")]
+        ws4.append(row)
     ws4.append([])
     # Two lines, and only what a reader needs to read a value in the table.
     # Design rationale, open questions and ticket references belong in the repo
@@ -262,6 +297,33 @@ def build_workbook(
             f"{cfg.recent_days} days. Titles come from the CRM and may be out of date."
         ]
     )
+    if other:
+        ws4.append(
+            [
+                f"Still at company? is {other}'s view of where each person works now. "
+                f"The {other} title and LinkedIn are filled only where they differ from "
+                "the CRM's. Neither source settles it — LinkedIn does; see the review queue."
+            ]
+        )
+
+    # Tab 5 — Review queue. Only with a provider: it holds the disagreements
+    # between the CRM and that provider, and there are none to hold without one.
+    if other:
+        ws5 = _sheet(
+            wb,
+            "5 - Review queue",
+            ["What", "Company", "Person", "CRM says", f"{other} says", "Check"],
+        )
+        for q in queue or []:
+            ws5.append([q["kind"], q["company"], q["who"], q["crm"], q["other"], q["check"]])
+        ws5.append([])
+        ws5.append(
+            [
+                "Things for a person to settle, most consequential first. Nothing here "
+                "has been changed anywhere — the CRM is updated by whoever works "
+                "through this list."
+            ]
+        )
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     wb.save(out_path)

@@ -1,0 +1,204 @@
+# Enrichment — a second opinion beside your CRM
+
+Optional. With no provider configured, a run and its output are exactly what
+`setup.md` describes: four tabs, nothing called, nothing spent. This file
+covers what changes when one is configured.
+
+**The one provider implemented is LeadIQ**, through its GraphQL API. Nothing
+else in the repository names it — the pipeline asks for "the configured
+provider" — so a second provider is one new module in `quorom/enrich/`.
+
+---
+
+## What it is for
+
+The map reports what your CRM holds, errors included: a company recorded at 10
+employees that has 150, a senior contact who left two years ago, a LinkedIn URL
+attached to the wrong person. Enrichment looks each of those up with the
+provider and shows what it says **beside** the CRM's value, so the
+disagreements are visible and a person can settle them.
+
+**Three sources, and none of them is the truth.**
+
+- **Your CRM** is what you have.
+- **The provider** is a second opinion. It can be out of date too.
+- **LinkedIn** is what a person checks by hand, and the one that settles it.
+
+So a provider value **never replaces** a CRM value. Quorom still writes nothing
+to your CRM. The output is a list of disagreements — tab 5, the review queue —
+for someone to work through and apply in the CRM themselves. That someone does
+not need CRM access to do the checking, which is deliberate.
+
+**Agreement is not confirmation.** If the provider is one of the sources your
+CRM was filled from, the two agreeing tells you little. The review queue holds
+disagreements and missing values; it does not certify everything else.
+
+---
+
+## Turning it on
+
+Set one environment variable, in `.env` locally or your secret store in
+production:
+
+```
+LEADIQ_API_KEY=your-api-key
+```
+
+That is the whole switch. Unset or empty, enrichment is off. Configure one
+provider at a time: with two, the run refuses to start rather than choosing
+between them, because a person one provider cannot find is reported as not
+found in *it* — never filled from another.
+
+**The first thing a run does with it** is one free account query, before the
+database is read or a CRM is called. A key that does not work fails there, not
+after everything else has been paid for. The log line names the plan and the
+credits available:
+
+```
+[i] Enrichment: LeadIQ — <plan name> (Active), <n> credits available
+```
+
+---
+
+## What it looks up
+
+| Where | Looked up by | Compared |
+|---|---|---|
+| Tab 3 — Company coverage | domain | employee count and HQ country, through your ICP test |
+| Tab 4 — Stakeholder list | email | current employer, title, LinkedIn URL |
+| Tab 2 — Missing from CRM | email | name and title |
+
+Each person and each company is looked up once per run, whichever tab asks
+first. Shared inboxes (`support@`, `info@` …) are never looked up — a role
+inbox is not a person, and a credit spent on it buys an answer that cannot be
+right.
+
+**Only the fields the map reads are requested.** A person lookup asks for name,
+current and past positions (title, employer, work emails), LinkedIn URL and when
+the record was last updated. **It never asks for a phone number or a personal
+email.** The map does not use them, and a phone number is the expensive field.
+
+### A result is accepted only if it is the person asked about
+
+A lookup by email can return a record for **someone else** — a different person
+at a different company, at the provider's highest confidence score, with none of
+the record's emails matching the one searched for. This was seen on a real call.
+Taken at face value it would report a stakeholder as having moved to a company
+they never worked at.
+
+So a person is accepted only when the email searched for is on the record, in a
+current or past position. A past position counts: the address in your CRM is
+often the one they left behind, and the record's current employer is then the
+finding. Anything else reads **"not found in LeadIQ"**. Companies are held to
+the same rule on domain.
+
+**Whether a move is caught depends on the provider keeping old addresses.** Not
+every record lists emails against past positions — one real record checked had
+none. Where it does not, a person whose CRM address is the one they left behind
+reads `not found in LeadIQ` rather than `no — now at …`. That is the safe way to
+miss: it never reports a move that did not happen. How often it happens is
+visible in any run as the count of `not found` rows on tab 4.
+
+---
+
+## What changes in the output
+
+**Tab 2 — Missing from CRM** gains `Name (LeadIQ)` and `Title (LeadIQ)`: who
+the provider says each missing person is. `not found in LeadIQ` where it has no
+record; `not looked up — shared inbox` for a role address.
+
+**Tab 3 — Company coverage** gains `Employees (LeadIQ)`, `HQ (LeadIQ)` and
+`Profile check`. The comparison is the **verdict**, not the number: your ICP
+test runs on each source's own values, and only a different answer matters.
+250 against 275 employees is inside a 50–500 band either way; 480 against 520
+flips it.
+
+| Profile check | Means |
+|---|---|
+| `agrees` | Both sources give the same ICP answer |
+| `disputed — LeadIQ says yes` / `… says no (<reason>)` | They give different answers — see below |
+| `not found in LeadIQ` | The provider has no record for the domain |
+| `CRM not assessed — LeadIQ says …` | No CRM is configured, so there is no CRM verdict to compare |
+
+**A disputed company goes onto the stakeholder list, marked.** A wrong "yes" is
+visible — the company appears on the map and someone looks at it. A wrong "no"
+is not: the company never reaches the map and nobody knows to look. So a
+company your CRM rejects and the provider would accept is put on tab 4 as
+`<company> (profile disputed)` for a person to settle. An existing customer
+(`CUSTOMER_ACCOUNT_TYPES`) stays off either way.
+
+**Tab 4 — Stakeholder list** gains three columns:
+
+| Column | Values |
+|---|---|
+| `Still at company?` | `yes` · `no — now at <company>` · `unclear — no current employer in LeadIQ` · `not found in LeadIQ` |
+| `Title (LeadIQ)` | Filled **only where it differs** from the CRM's title — and left blank for someone who has moved, whose provider title is for a different job |
+| `LinkedIn (LeadIQ)` | Filled **only where it differs** from the CRM's URL |
+
+A detected move flags the row; it never removes it. The CRM record is still
+what you have, and a name vanishing without explanation is worse than a name
+marked stale.
+
+**Tab 5 — Review queue** exists only with a provider configured. One row per
+thing a person should settle, most consequential first, each saying what to
+check and where:
+
+| What | When |
+|---|---|
+| Profile fit disputed | The two sources give different ICP answers |
+| Headcount or HQ missing | Either source lacks the employee count or HQ the ICP test needs |
+| May have left | The provider places the person at a different company |
+| Account may be linked to the wrong company | The CRM account's name does not resemble the domain it was reached through |
+| Title differs | The provider's title differs from the CRM's |
+| LinkedIn differs | The provider's LinkedIn URL differs from the CRM's |
+
+**Account linking** is the one no lookup fixes. The map reaches a CRM account
+through its Website field, so one wrong value there pulls another company's
+contacts in under it. Only someone correcting the account in the CRM can fix
+that; the queue says where to look.
+
+The JSON dump carries the same: each company and stakeholder row holds the
+provider's values, `enrichment_provider` names the provider (null when none was
+asked), and `review_queue` is the tab as data.
+
+---
+
+## What it costs
+
+Credits, on LeadIQ's rate card at the time of writing: **1 per person record,
+3 per company record, 10 per mobile phone.** Check your own plan — the `account`
+query the run makes at the start reports it.
+
+Measured on one account, September 2026, reading the account's credit balance
+before and after:
+
+| Call | Credits used |
+|---|---|
+| Person lookup that also selected a phone number (an ad-hoc query, not this module's) | 11 — consistent with 1 for the record and 10 for the phone |
+| Person lookup as this module makes it, matched | 0 |
+| Person lookup with no match | 0 |
+| Company lookup by domain (five domains) | 0 |
+
+So in practice lookups have cost less than the rate card says. Why is unknown —
+records the account has already unlocked may be free — so do not rely on it.
+This module never selects a phone number, so a person lookup costs at most the
+record.
+
+**A week's spend at rate-card prices, from one real week's counts** (33
+companies met, about 45 people on the stakeholder list and 19 not in the CRM):
+about 65 credits for person records, plus about 100 if company lookups are
+charged at 3 — so **at most about 165 a week**, and possibly far less. An
+estimate, not a measurement: compare the `account` query's `used` before and
+after your first enriched run.
+
+---
+
+## What it does not do
+
+- **Write anything.** Not to your CRM, not to the provider. The review queue is
+  for a person.
+- **Discover people you have not met.** It checks the people already on the map.
+  Finding new senior contacts at a company is a different job and is not built.
+- **Look up phone numbers.** Never requested.
+- **Decide.** Where the sources disagree, the map shows both and the queue asks
+  a person. LinkedIn settles it.

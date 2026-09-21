@@ -83,8 +83,9 @@ should not have to do it twice.
 **Every number names its source, or says unknown.**
 
 **Enrichment costs money.** Project spend before any bulk operation, and default
-to the cheapest field that unblocks the action. Today the pipeline calls no
-enrichment provider at all and spends nothing.
+to the cheapest field that unblocks the action. The one enrichment provider
+implemented is optional and off unless configured; without it a run spends
+nothing. `docs/enrichment.md` states what it looks up and what that costs.
 
 ---
 
@@ -196,8 +197,11 @@ Before spending on the expensive fields, determine whether availability can be
 checked without a paid reveal. If it can't, sample a handful of known names and
 report the hit rate before scaling.
 
-**As shipped, none of this applies:** no enrichment provider is wired up and a
-run spends nothing. Every field in the output comes from your own systems.
+**Unless you configure an enrichment provider, none of this applies:** a run
+spends nothing and every field in the output comes from your own systems. The
+one provider implemented looks up person records and company records — never a
+mobile number — and shows what it finds beside the CRM's values rather than in
+place of them. `docs/enrichment.md`.
 
 ---
 

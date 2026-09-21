@@ -104,18 +104,25 @@ def group_companies(people: list[dict]) -> dict[str, dict]:
     return companies
 
 
+def missing_from_crm(row: dict) -> bool:
+    """Does this reconciled person belong on tab 2?
+
+    Asked in two places — the workbook, and the enrichment pass that looks
+    these people up — so it is asked here once. None is "not checked" and never
+    counts: only a CRM that was asked and said no puts a person on the tab.
+    """
+    return row.get("in_hubspot") is False or row.get("in_salesforce") is False
+
+
 def company_mismatch(domain: Optional[str], crm_company: Optional[str]) -> bool:
-    """Does the CRM company look unrelated to the domain we met them on?
+    """Does the CRM account's name look unrelated to the domain it was reached
+    through?
 
-    NOT WIRED UP, deliberately, and called from nowhere. Turning it into a Flag
-    value would add a column value the spec never asked for, and "possibly
-    attached to the wrong company" is the sort of judgement the artifact is
-    supposed to leave to the reader.
-
-    Kept because part (b) of the CRM check in the root README — is the contact
-    associated with the right company — will need something like it, and this is
-    the shape it would take. It ships wired up when that read path is designed,
-    not before.
+    Read by the review queue (tab 5, `weekly/enrichment.py`) and nowhere else —
+    as a question for a person, never as a Flag value. The map reaches an account
+    through its Website field, so one wrong value there pulls another company's
+    contacts in under it; no lookup fixes that, only someone correcting the
+    account does. A heuristic, so it asks rather than asserts.
     """
     if not domain or not crm_company:
         return False

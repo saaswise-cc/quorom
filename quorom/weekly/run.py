@@ -9,13 +9,14 @@ from __future__ import annotations
 import json
 import os
 
-from .. import db, geography
+from .. import db, enrich, geography
 from ..config import Config
 from ..crm import fieldmap as fieldmap_mod
 from ..crm.fieldmap import FieldMap
 from ..crm.hubspot import HubSpot
 from ..crm.salesforce import Salesforce
 from . import coverage as coverage_mod
+from . import enrichment as enrichment_mod
 from . import people as people_mod
 from . import retention as retention_mod
 from . import stakeholders as stakeholders_mod
@@ -92,6 +93,17 @@ def run_weekly(cfg: Config, log=print) -> dict:
         log("[i] Salesforce: pasted token (expires ~2h — see docs/salesforce-access.md).")
     if not hs.configured:
         log("[i] HubSpot not configured — its columns are omitted from tabs 2 and 3.")
+
+    # The enrichment provider's one free call, made here — before the database
+    # is read or a CRM is called — for the reason every other guard in this
+    # function is at the top: a key that does not work would otherwise surface
+    # after all of that had been paid for.
+    provider = enrich.configured()
+    if provider is None:
+        log("[i] No enrichment provider configured — no provider columns, no review queue.")
+    else:
+        log(f"[i] Enrichment: {provider.display_name} — {provider.check()}")
+    enriching = enrichment_mod.start(provider)
 
     with db.connect(cfg) as conn:
         # Read first, before any work: the profile carries the ICP test and the
@@ -175,6 +187,17 @@ def run_weekly(cfg: Config, log=print) -> dict:
         log(f"[*] Building company coverage for {len(companies)} companies...")
         coverage = coverage_mod.build_coverage(cfg, companies, profile, sf, hs, log=log)
 
+        # Before the map is chosen: a company whose verdict the provider
+        # disputes goes onto the stakeholder list, so this has to have run
+        # before companies_for_map() is asked.
+        if enriching:
+            enrichment_mod.companies(enriching, coverage, profile)
+            disputed = sum(1 for c in coverage if c.get("disputed"))
+            log(
+                f"[*] {provider.display_name}: {enriching.companies_looked_up} companies "
+                f"looked up, {disputed} ICP verdict(s) disputed"
+            )
+
         type_counts = coverage_mod.observed_account_types(coverage)
         log(f"[*] Account.Type values observed: {type_counts}")
 
@@ -225,6 +248,17 @@ def run_weekly(cfg: Config, log=print) -> dict:
             f"contact" + (f", {len(undetermined)} not assessed" if unassessed else "") + ")"
         )
 
+        queue: list[dict] = []
+        if enriching:
+            enrichment_mod.stakeholders(enriching, stakeholders)
+            enrichment_mod.not_in_crm(enriching, reconciled)
+            queue = enrichment_mod.review_queue(enriching, coverage, stakeholders)
+            moved = sum(1 for r in stakeholders if str(r.get("still_at", "")).startswith("no —"))
+            log(
+                f"[*] {provider.display_name}: {enriching.people_looked_up} people looked "
+                f"up, {moved} may have left, {len(queue)} item(s) in the review queue"
+            )
+
         describe = sf.describe_contact() if sf.configured else {"checked": False}
         if describe.get("checked"):
             log(f"[*] Contact.describe: {describe['field_count']} fields")
@@ -239,6 +273,8 @@ def run_weekly(cfg: Config, log=print) -> dict:
         # reach the workbook rather than being described in the abstract.
         profile=profile,
         geo_label=geography.prose_label(selections),
+        enrichment=provider.display_name if provider else None,
+        queue=queue,
     )
     log(f"[✓] Wrote {xlsx_path}")
 
@@ -260,6 +296,10 @@ def run_weekly(cfg: Config, log=print) -> dict:
             "sf_bench": bench_raw,
             "stakeholders": stakeholders,
             "contact_describe": describe,
+            # Which provider's view sits beside the CRM's in coverage and
+            # stakeholders above, or null. Null means none was asked.
+            "enrichment_provider": provider.display_name if provider else None,
+            "review_queue": queue,
         },
     )
     log(f"[✓] Wrote {json_path}")

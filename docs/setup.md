@@ -194,8 +194,10 @@ stakeholder list is built entirely from Salesforce contacts, so without it you
 get the meeting reconciliation and the company coverage, and a stakeholder tab
 that is all gaps.
 
-**It costs nothing to run.** Every field in the output comes from Gong,
-Salesforce or HubSpot — data you already own. No enrichment provider is called.
+**It costs nothing to run** unless you turn on the optional enrichment provider,
+which spends that provider's credits — `docs/enrichment.md`. Without it, every
+field in the output comes from Gong, Salesforce or HubSpot — data you already
+own.
 
 ---
 
@@ -755,6 +757,9 @@ GONG_ACCESS_KEY_SECRET=
 ```
 
 Then Salesforce per section 7, and `HUBSPOT_SERVICE_KEY` if you have one.
+Enrichment is optional and off unless its key is set; `docs/enrichment.md` has
+the variable, what it looks up and what it costs. Leave it for after the first
+run works without it.
 
 `.env.example` lists both Salesforce auth modes together. Only one of them
 applies to you, and nothing in the file says which — so mark it as you edit:
@@ -905,7 +910,8 @@ WEEK_START=2026-08-17 quorom weekly
 It writes into `OUTPUT_DIR` and nowhere else — no writes back to Gong,
 Salesforce, HubSpot or anywhere in your CRM:
 
-- `weekly_stakeholder_map_<week>.xlsx` — the artifact, four tabs
+- `weekly_stakeholder_map_<week>.xlsx` — the artifact, four tabs (five with
+  an enrichment provider configured)
 - `stakeholder_inputs_<week>.json` — every input the run read
 - `weekly_view_<week>.html` — a single-page view of the same thing
 - `last_run.json` — the manifest: the three paths above, plus the week they
@@ -944,7 +950,7 @@ Paths are absolute, so a delivery step does not have to share the run's working
 directory. The manifest is written last, after retention — so if it is there,
 the run finished.
 
-The four tabs:
+The tabs:
 
 | Tab | What it answers |
 |---|---|
@@ -952,6 +958,7 @@ The four tabs:
 | **2 — Missing from CRM** | Which of those people are not in Salesforce or HubSpot. Attendees with neither email nor domain (meeting bots) are listed at the foot — suppressed visibly, not dropped. |
 | **3 — Company coverage** | Every external company met: size, HQ, whether it meets your profile, how many contacts you hold |
 | **4 — Stakeholder list** | The map. The senior people at the ICP-fit companies worth considering, capped at `SHORTLIST_SIZE` each |
+| **5 — Review queue** | Only with an enrichment provider configured: where your CRM and the provider disagree, for a person to settle. The provider's values also appear beside the CRM's on tabs 2, 3 and 4 — `docs/enrichment.md` |
 
 **`docs/reading-your-first-run.md` is what to send to whoever receives this
 file.** It covers what to check first to know the run worked, what looks
@@ -971,8 +978,10 @@ for the reader of the map rather than for whoever stood the deployment up.
 - **No action is suggested per person.** The output says who is worth
   considering and stops. Outreach is a sequence — connect, perhaps message,
   perhaps request a meeting — and that sequence is not decided here.
-- **Nobody is checked for still being at the company.** CRM contacts go stale.
-  The column is absent rather than saying "not checked" on every row.
+- **Nobody is checked for still being at the company** unless an enrichment
+  provider is configured. CRM contacts go stale; without a provider the column
+  is absent rather than saying "not checked" on every row. With one, it is
+  `Still at company?` on tab 4 — the provider's view, which can be stale too.
 
 ---
 
@@ -1297,4 +1306,5 @@ answerable.
 `docs/supported-configuration.md` is the honest answer to "will this work for
 me". Read it before you conclude something is missing — in particular: Gong is
 the only meeting source implemented, Salesforce is the only CRM, geography does
-not go below country level, and no enrichment provider is wired up.
+not go below country level, and one enrichment provider is implemented —
+optional, and off unless configured.

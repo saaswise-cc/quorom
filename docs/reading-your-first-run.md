@@ -1,6 +1,6 @@
 # Reading your first run
 
-`setup.md` §12 lists what the four tabs contain. This file is about what to make
+`setup.md` §12 lists what the tabs contain. This file is about what to make
 of them — what to check first, what looks wrong and isn't, and what to actually
 do about each kind of gap.
 
@@ -10,7 +10,7 @@ thing to send along with the first run.
 
 ## Before anything else: three things that tell you the run worked
 
-A run can complete, produce all four tabs, and still have done almost nothing —
+A run can complete, produce every tab, and still have done almost nothing —
 because the legs it needs were not configured, not because anything failed.
 That is deliberate: gaps are output, not errors. So the first pass is checking
 which legs actually ran.
@@ -74,6 +74,10 @@ see what was removed.
 - **People appearing twice under different addresses.** Someone who changed
   email address can split into two people, which also makes a recent contact
   read as "no".
+- **Another company's people listed under an account.** The map reaches a CRM
+  account through its Website field, so one wrong value there pulls another
+  company's contacts in under it. Nothing in the run can fix that; someone
+  correcting the account in the CRM can.
 
 ## What to do with each kind of gap
 
@@ -89,14 +93,37 @@ happens in your own systems.
 | Company met, no employee count | Excluded from the map entirely | Fill the firmographics if the company matters to you |
 | Fits profile, no senior contact | The stakeholder gap | Find who the senior people there are. This is where a data provider or a browser extension earns its place, and it is a person's step, not a pipeline's. |
 | Fits profile, senior contacts present | The map did its job | Decide who is worth approaching |
+| A row on tab 5, the review queue | Your CRM and the enrichment provider disagree, or one is missing a value | Check the place the row names — usually LinkedIn — and correct whichever source is wrong. Only with a provider configured. |
 
 **No action is suggested per person, deliberately.** The output says who is
 worth considering and stops. Outreach is a sequence — connect, perhaps message,
 perhaps request a meeting — and the run does not decide that sequence for you.
 
-**Nobody is checked for still being at the company.** CRM contacts go stale and
-the run cannot tell. There is no column claiming otherwise, which is preferable
-to one that says "not checked" on every row.
+**Nobody is checked for still being at the company** — unless an enrichment
+provider is configured. CRM contacts go stale and, on its own, the run cannot
+tell. Without a provider there is no column claiming otherwise, which is
+preferable to one that says "not checked" on every row.
+
+## If an enrichment provider is configured
+
+The provider's values sit **beside** the CRM's on tabs 2, 3 and 4, and a fifth
+tab lists where they disagree. `docs/enrichment.md` has the detail; what a
+reader needs:
+
+- **Neither source is the truth.** The provider can be out of date as easily as
+  the CRM. LinkedIn settles a disagreement. The two agreeing is not proof either.
+- **`(profile disputed)` beside a company on tab 4** means the CRM and the
+  provider give different answers to your ICP test. It is on the list so the
+  question gets asked — a company wrongly rejected would otherwise never appear.
+- **`Still at company?`** is the provider's view of where each person works now.
+  `no — now at …` is a reason to check, not a conclusion. The row stays on the
+  list either way.
+- **A provider title or LinkedIn column that is mostly blank is normal.** Those
+  columns are filled only where the provider differs from the CRM.
+- **`not found in <provider>`** means it was looked up and the provider has no
+  record. It is not a verdict about the person or company.
+- **Tab 5 is the work.** Every row says what to check and where. Nothing in it
+  has been changed anywhere — the CRM is updated by whoever works through it.
 
 ## Why the second run is worth more than the first
 

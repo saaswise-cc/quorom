@@ -5,7 +5,7 @@ the design allows. Where something is not supported, the entry says what it
 would take — so you can judge the work rather than discover it.
 
 Checked against the code on 2026-09-04, after the field-map, geography and
-ICP-test work.
+ICP-test work, and again on 2026-09-21 when the enrichment provider was added.
 
 | | Supported | Notes |
 |---|---|---|
@@ -19,7 +19,7 @@ ICP-test work.
 | **Database** | PostgreSQL 13+ | `gen_random_uuid()` is built in from 13 |
 | **Delivery** | Local files | A workbook, a JSON dump and an HTML page |
 | **Scheduling** | None | The repo defines no packaging or scheduling |
-| **Enrichment providers** | None wired up | The pipeline spends nothing |
+| **Enrichment providers** | One, optional | Off unless its key is set, and then the output is unchanged apart from the provider's columns and tab 5. Never replaces a CRM value — `docs/enrichment.md` |
 
 ---
 
@@ -124,9 +124,11 @@ relationship.
 contact column says yes or no, so importing less produces rows saying "no" for
 people who were met. `quorom import` with no arguments does exactly that window.
 
-**Nobody is checked for still being at the company.** CRM contacts go stale as
-people move, and this list suggests people to approach. The column is absent
-rather than saying "not checked" on every row.
+**Nobody is checked for still being at the company** unless an enrichment
+provider is configured. CRM contacts go stale as people move, and this list
+suggests people to approach. Without a provider the column is absent rather than
+saying "not checked" on every row; with one, `Still at company?` gives the
+provider's view, which can be out of date too.
 
 **No outreach action is suggested per person.** Real outreach is a sequence —
 connect, perhaps message, perhaps request a meeting — and that sequence is not
@@ -136,6 +138,9 @@ decided here. The output says who is worth considering and stops.
 
 ## What it costs to run
 
-Nothing. Every field in the output comes from Gong, Salesforce or HubSpot — data
-you already own. No enrichment provider is called. Mobile numbers are reported
-as present or absent, never revealed or stored.
+Nothing, unless you configure the optional enrichment provider. Without it,
+every field in the output comes from Gong, Salesforce or HubSpot — data you
+already own, and no provider is called. With it, each run spends that
+provider's credits on the lookups `docs/enrichment.md` lists, with an estimate
+per week. Either way, mobile numbers are reported as present or absent in the
+CRM, never revealed or stored, and never requested from the provider.
