@@ -61,10 +61,10 @@ see what was removed.
 
 ## What actually indicates something is wrong
 
-- **Every row on tab 1 flagged with a red `GAP` and a blank LinkedIn.** Your CRM
-  leg is not reaching your data. If no CRM were configured those columns would
-  not be there at all, so seeing them empty on every row means one was
-  configured and is answering with nothing.
+- **Every row on tab 1 reading `no` under `Mobile in CRM?` and blank under
+  `LinkedIn?`.** Your CRM leg is not reaching your data. If no CRM were
+  configured those columns would not be there at all, so seeing them empty on
+  every row means one was configured and is answering with nothing.
 - **Companies you know are large showing no employee count.** A company with no
   count is excluded from the map entirely rather than given the benefit of the
   doubt, so this silently shrinks tab 4.

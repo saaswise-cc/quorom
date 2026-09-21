@@ -75,6 +75,12 @@ def recent_contact(cfg: Config, history: Optional[dict], last_activity) -> str:
     saying which). Recent means inside cfg.recent_days. The kind of contact is
     stated rather than judged, so a reader can discount a training session
     themselves instead of the code deciding for them.
+
+    Date first, kind second: "yes — 2026-08-18 (group call)". The column is
+    narrow, and with the date last a long kind pushed it into the ellipsis —
+    losing the part that answers "how recent". The attendee count is dropped
+    for the same reason; the label alone is what stops a webinar reading as a
+    relationship.
     """
     cutoff = dt.date.today() - dt.timedelta(days=cfg.recent_days)
     met = _as_date((history or {}).get("last_met"))
@@ -82,14 +88,10 @@ def recent_contact(cfg: Config, history: Optional[dict], last_activity) -> str:
 
     if met and met >= cutoff:
         smallest = int((history or {}).get("smallest_meeting") or 0)
-        kind = (
-            f"group call, {smallest} attendees"
-            if smallest > cfg.group_call_min
-            else "met"
-        )
-        return f"yes — {kind} {met.isoformat()}"
+        kind = "group call" if smallest > cfg.group_call_min else "met"
+        return f"yes — {met.isoformat()} ({kind})"
     if activity and activity >= cutoff:
-        return f"yes — CRM activity {activity.isoformat()}"
+        return f"yes — {activity.isoformat()} (CRM activity)"
 
     last = max([d for d in (met, activity) if d], default=None)
     return f"no — last contact {last.isoformat()}" if last else "no — none on record"

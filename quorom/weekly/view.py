@@ -70,14 +70,30 @@ LINKEDIN = re.compile(
     r"^(?:https?://)?(?:[\w-]+\.)*linkedin\.com/in/(?P<handle>[^/?#\s]+)", re.I
 )
 
+# Two more shapes a CRM holds, neither of which reads as a label:
+#
+# - `/in/<member ID>` (ACwAA…, ACoAA…) — LinkedIn redirects it to the real
+#   profile, so the link works, but the ID is gibberish as text.
+# - Sales Navigator (`/sales/people/…`, `/sales/lead/…`) — it cannot be turned
+#   into a public profile URL, and it opens only for someone with Sales
+#   Navigator. The label says so, rather than a link that fails for most readers.
+MEMBER_ID = re.compile(r"^AC[A-Za-z0-9]AA[\w-]{10,}$")
+SALES_NAV = re.compile(r"^(?:https?://)?(?:[\w-]+\.)*linkedin\.com/sales/\S+", re.I)
+
 
 def _linkedin(value: str) -> str:
     """A short, clickable profile link, or "" if this is not a LinkedIn URL."""
-    match = LINKEDIN.match(value.strip())
+    value = value.strip()
+    if SALES_NAV.match(value):
+        url = value if re.match(r"https?://", value, re.I) else f"https://{value}"
+        return f'<a href="{html.escape(url)}">Sales Nav only</a>'
+    match = LINKEDIN.match(value)
     if not match:
         return ""
     handle = html.escape(match.group("handle"))
-    return f'<a href="https://www.linkedin.com/in/{handle}">{handle}</a>'
+    href = f"https://www.linkedin.com/in/{handle}"
+    label = "LinkedIn profile" if MEMBER_ID.match(match.group("handle")) else handle
+    return f'<a href="{href}">{label}</a>'
 
 
 def cell(col: str, value: str) -> tuple[str, str]:

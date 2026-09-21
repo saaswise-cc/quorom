@@ -13,7 +13,7 @@ This is the other half. An adapter hands back `Contact`, and nothing under
 Six fields, each one read by a column:
 
   name           tab 4 'Name'
-  title          tab 1 'Title (SF)', tab 4 'Title', and the seniority ordering
+  title          tab 1 'Title (CRM)', tab 4 'Title', and the seniority ordering
   email          the key meeting history is joined on
   mobile         tab 1 and tab 4 'Mobile in CRM?' — presence only. The number
                  itself never leaves the CRM: sensitive contact fields pass

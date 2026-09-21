@@ -57,20 +57,25 @@ def _mobile_cell(value) -> str:
     return "yes" if value else "no"
 
 
-def _crms_queried(cfg: Config) -> list[str]:
-    """The CRMs this run actually called, in column order.
+def _checked_against(cfg: Config) -> str:
+    """Tab 2's caption line naming the one CRM it was checked against, or "".
 
-    Headers and the Source column are both built from this list, so a system
-    that was never queried cannot appear in either. The names are the vendors'
-    own, which is fine in a value that reports provenance — what is not fine is
+    This used to be a Source column holding the same value on every row, under
+    the header that means "where this person came from" on tab 1 — so a tab of
+    people not in Salesforce read "salesforce" beside each of them. A run-wide
+    fact is stated once, in the caption, the way tab 3 states its ICP test.
+
+    With both CRMs configured the "In …?" columns already say it per row, and
+    with none the tab has no rows to explain. The names are the vendors' own,
+    which is fine in a line that reports provenance — what is not fine is
     naming one that was not consulted.
     """
     names = []
     if cfg.hubspot.configured:
-        names.append("hubspot")
+        names.append("HubSpot")
     if cfg.salesforce.configured:
-        names.append("salesforce")
-    return names
+        names.append("Salesforce")
+    return f"Checked against {names[0]}." if len(names) == 1 else ""
 
 
 def _profile_sentence(profile: dict, geo_label: str) -> str:
@@ -155,16 +160,18 @@ def build_workbook(
     # already said it. The columns earn their place only when both are on,
     # which is the case they exist for: "in HubSpot but not Salesforce" is
     # actionable, and a single merged "In CRM?" would throw that away.
+    #
+    # No Source column, for the same reason: it was the same value on every row.
+    # Which CRM the tab was checked against is a caption line instead.
     hs_on = cfg.hubspot.configured
     sf_on = cfg.salesforce.configured
     both_crms = hs_on and sf_on
-    source = "/".join(_crms_queried(cfg))
     ws2 = _sheet(
         wb,
         "2 - Missing from CRM",
         ["Name", "Email", "Company (domain)"]
         + (["In HubSpot?", "In Salesforce?"] if both_crms else [])
-        + ["Flag", "Source"],
+        + ["Flag"],
     )
     for r in reconciled:
         in_sf = r.get("in_salesforce")
@@ -179,9 +186,13 @@ def build_workbook(
             row = [r.get("attendee_name"), r.get("email", ""), r.get("domain")]
             if both_crms:
                 row += ["yes" if in_hs else "NO", "yes" if in_sf else "NO"]
-            ws2.append(row + [flag, source])
-    if suppressed:
+            ws2.append(row + [flag])
+    checked = _checked_against(cfg)
+    if checked or suppressed:
         ws2.append([])
+    if checked:
+        ws2.append([checked])
+    if suppressed:
         ws2.append(
             [
                 "Suppressed as non-contacts (no email/domain — likely meeting bots): "

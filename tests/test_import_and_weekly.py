@@ -282,6 +282,72 @@ def test_a_linkedin_profile_renders_short_and_clickable(stored, handle):
     )
 
 
+@pytest.mark.parametrize(
+    "stored, href, label",
+    [
+        # A member ID: LinkedIn redirects it to the real profile, so it is kept
+        # as the link — but as text it is gibberish, so it is not the label.
+        (
+            "https://www.linkedin.com/in/ACwAAAB1c2VyLWlkLWV4YW1wbGUtMDAx",
+            "https://www.linkedin.com/in/ACwAAAB1c2VyLWlkLWV4YW1wbGUtMDAx",
+            "LinkedIn profile",
+        ),
+        (
+            "linkedin.com/in/ACoAAAB1c2VyLWlkLWV4YW1wbGUtMDAy/",
+            "https://www.linkedin.com/in/ACoAAAB1c2VyLWlkLWV4YW1wbGUtMDAy",
+            "LinkedIn profile",
+        ),
+        # Sales Navigator: no public equivalent can be derived, and it opens
+        # only for someone with Sales Navigator, which the label says.
+        (
+            "https://www.linkedin.com/sales/people/ACwAAAB1c2Vy,NAME_SEARCH,abcd",
+            "https://www.linkedin.com/sales/people/ACwAAAB1c2Vy,NAME_SEARCH,abcd",
+            "Sales Nav only",
+        ),
+        (
+            "www.linkedin.com/sales/lead/ACwAAAB1c2Vy,NAME_SEARCH,abcd",
+            "https://www.linkedin.com/sales/lead/ACwAAAB1c2Vy,NAME_SEARCH,abcd",
+            "Sales Nav only",
+        ),
+        # A handle that happens to start with "ac" is still a handle.
+        ("https://www.linkedin.com/in/acwaa-smith", "https://www.linkedin.com/in/acwaa-smith",
+         "acwaa-smith"),
+    ],
+)
+def test_linkedin_ids_and_sales_nav_render_as_a_short_label(stored, href, label):
+    from quorom.weekly.view import cell
+
+    _, rendered = cell("LinkedIn", stored)
+    assert rendered == f'<a href="{href}">{label}</a>'
+
+
+@pytest.mark.parametrize(
+    "history, activity, expected",
+    [
+        ({"last_met": "{d}", "smallest_meeting": 26}, None, "yes — {d} (group call)"),
+        ({"last_met": "{d}", "smallest_meeting": 3}, None, "yes — {d} (met)"),
+        (None, "{d}", "yes — {d} (CRM activity)"),
+    ],
+)
+def test_recent_contact_puts_the_date_first(history, activity, expected):
+    """The column is narrow. With the date last, "group call, 26 attendees"
+    pushed it into the ellipsis — losing the part that says how recent. Date
+    first means truncation cuts the least useful part."""
+    import datetime as dt
+    from types import SimpleNamespace
+
+    from quorom.weekly.stakeholders import recent_contact
+
+    d = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+    cfg = SimpleNamespace(recent_days=90, group_call_min=8)
+    if history:
+        history = {k: (v.format(d=d) if isinstance(v, str) else v) for k, v in history.items()}
+    got = recent_contact(cfg, history, activity.format(d=d) if activity else None)
+
+    assert got == expected.format(d=d)
+    assert "attendees" not in got
+
+
 def test_tab_1_states_what_was_never_asked(database, gong_calls, tmp_path):
     """With no CRM configured, tab 1's CRM-derived columns must say the
     question was not asked. They used to assert answers: `GAP` in red on every
@@ -507,7 +573,7 @@ def test_tabs_2_and_3_omit_a_crm_that_was_never_queried(database, gong_calls, tm
     # Tab 2 — neither "In HubSpot?" nor "In Salesforce?" is offered, so
     # "not checked" never has to appear on this tab at all.
     assert _headers(wb["2 - Missing from CRM"]) == [
-        "Name", "Email", "Company (domain)", "Flag", "Source",
+        "Name", "Email", "Company (domain)", "Flag",
     ]
 
     # Tab 3 — the count columns for both unqueried providers are gone. A 0
@@ -541,20 +607,20 @@ def test_tabs_2_and_3_omit_a_crm_that_was_never_queried(database, gong_calls, tm
 
 
 @pytest.mark.parametrize(
-    "hs_on, sf_on, crm_columns, source",
+    "hs_on, sf_on, crm_columns, checked",
     [
-        (True, True, ["In HubSpot?", "In Salesforce?"], "hubspot/salesforce"),
-        (True, False, [], "hubspot"),
-        (False, True, [], "salesforce"),
-        (False, False, [], ""),
+        (True, True, ["In HubSpot?", "In Salesforce?"], None),
+        (True, False, [], "Checked against HubSpot."),
+        (False, True, [], "Checked against Salesforce."),
+        (False, False, [], None),
     ],
 )
 def test_workbook_columns_follow_the_crms_configured(
-    tmp_path, hs_on, sf_on, crm_columns, source
+    tmp_path, hs_on, sf_on, crm_columns, checked
 ):
     """Both columns survive when both CRMs are on — "in HubSpot but not
     Salesforce" is the actionable answer and merging them into one "In CRM?"
-    would lose it. Source always names exactly what was queried.
+    would lose it.
 
     **With only one CRM configured, neither column is rendered.** Every row on
     this tab is here because it is missing from a CRM, so a single CRM's column
@@ -562,23 +628,24 @@ def test_workbook_columns_follow_the_crms_configured(
     supersedes the earlier expectation that the configured one survived alone —
     a real deployment running one CRM read it as a redundant column, and it was.
 
-    A unit test rather than an end-to-end one: configuring a CRM leg here would
-    make the run reach for the real API. The credentials below are literals, so
-    nothing real can leak into a failure message.
+    **No Source column either.** It held which CRMs were checked — the same
+    value on every row, under a header that means "where this person came from"
+    on tab 1. With one CRM that fact is stated once, in the caption; with both,
+    the two columns state it per row.
+
+    A unit test rather than an end-to-end one: configuring a CRM leg there would
+    make the run reach for the real API. The config is a stub, not Config(),
+    which reads the environment.
     """
-    from quorom.config import HubSpotConfig, SalesforceConfig
+    from types import SimpleNamespace
+
     from quorom.weekly.workbook import build_workbook
 
-    cfg = Config(
-        account=ACCOUNT,
-        output_dir=str(tmp_path),
-        hubspot=HubSpotConfig(api_key="test-key" if hs_on else ""),
-        salesforce=SalesforceConfig(
-            access_token="test-token" if sf_on else "",
-            instance_url="https://example.invalid" if sf_on else "",
-        ),
+    cfg = SimpleNamespace(
+        hubspot=SimpleNamespace(configured=hs_on),
+        salesforce=SimpleNamespace(configured=sf_on),
+        recent_days=90,
     )
-    assert cfg.hubspot.configured is hs_on and cfg.salesforce.configured is sf_on
 
     reconciled = [
         {
@@ -611,7 +678,7 @@ def test_workbook_columns_follow_the_crms_configured(
 
     ws2 = wb["2 - Missing from CRM"]
     assert _headers(ws2) == (
-        ["Name", "Email", "Company (domain)"] + crm_columns + ["Flag", "Source"]
+        ["Name", "Email", "Company (domain)"] + crm_columns + ["Flag"]
     )
 
     ws3 = wb["3 - Company coverage"]
@@ -622,18 +689,22 @@ def test_workbook_columns_follow_the_crms_configured(
         + (["HubSpot contacts"] if hs_on else [])
     )
 
-    rows = [r for r in ws2.iter_rows(min_row=2, values_only=True) if r[0]]
+    all_rows = list(ws2.iter_rows(min_row=2, values_only=True))
+    # Caption lines sit in column A with the rest of the row blank.
+    captions = [r[0] for r in all_rows if r[0] and not any(r[1:])]
+    rows = [r for r in all_rows if r[0] and any(r[1:])]
+    assert captions == ([checked] if checked else [])
+
     if not (hs_on or sf_on):
         # Nothing can be missing from a CRM that was never consulted.
         assert rows == []
         return
 
     assert len(rows) == 1
-    # Source names every CRM queried and nothing else.
-    assert rows[0][-1] == source
-    for vendor in ("hubspot", "salesforce"):
-        if vendor not in source:
-            assert vendor not in " ".join(str(v) for v in rows[0]).lower()
+    # No vendor is named on the row itself: which CRM was checked is either
+    # the caption or the column headers.
+    assert "hubspot" not in " ".join(str(v) for v in rows[0]).lower()
+    assert "salesforce" not in " ".join(str(v) for v in rows[0]).lower()
     # Every rendered CRM cell is a real answer, never "not checked".
     assert list(rows[0][3:3 + len(crm_columns)]) == ["NO"] * len(crm_columns)
 
@@ -767,7 +838,7 @@ def test_group_call_is_labelled_not_judged(database, gong_calls):
     assert trainee["smallest_meeting"] == 9      # above GROUP_CALL_MIN of 8
     # Recency is computed against today, so assert the label rather than the date.
     label = recent_contact(cfg, trainee, None)
-    assert "group call, 9 attendees" in label or label.startswith("no —")
+    assert label.endswith("(group call)") or label.startswith("no —")
 
 
 @pytest.mark.parametrize(

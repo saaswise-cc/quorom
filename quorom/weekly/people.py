@@ -147,7 +147,8 @@ def _linkedin_presence(sf: Salesforce, contact: Optional[Contact]):
 
 
 def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
-    """One attendee against both CRMs. Salesforce wins on Title.
+    """One attendee against whichever CRMs are configured. Salesforce wins on
+    Title.
 
     Both adapters hand back a `Contact`, so nothing here names a field in either
     system — which is what lets a third CRM be added without touching this file.
@@ -192,10 +193,16 @@ def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
         if missing:
             flags.append("needs " + " + ".join(missing))
 
-    if sf_title and hs_title and sf_title.lower() != hs_title.lower():
-        flags.append(f"title differs (SF: {sf_title} / HS: {hs_title})")
-    elif (bool(sf_title) != bool(hs_title)) and (sf_title or hs_title):
-        flags.append("title only in " + ("Salesforce" if sf_title else "HubSpot"))
+    # These two flags compare one CRM with the other, so they exist only when
+    # both were asked. With one configured, "title only in Salesforce" fired on
+    # every row that had a title and on none without — it meant "has a title",
+    # which the Title column already says. An unconfigured CRM returns no
+    # record, which is not the same as a record with no title.
+    if sf.configured and hs.configured:
+        if sf_title and hs_title and sf_title.lower() != hs_title.lower():
+            flags.append(f"title differs (SF: {sf_title} / HS: {hs_title})")
+        elif (bool(sf_title) != bool(hs_title)) and (sf_title or hs_title):
+            flags.append("title only in " + ("Salesforce" if sf_title else "HubSpot"))
 
     return {
         **person,

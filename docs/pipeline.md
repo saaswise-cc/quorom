@@ -226,12 +226,17 @@ the JSON dump. `linkedin` is three-valued — a URL, `""` for nothing on file, a
   who attended comes from the meeting source. `Flag` survives too, minus its
   `needs title` half, which is a finding about a CRM that was not asked.
 - tab 2 — `In HubSpot?`, `In Salesforce?`, and which rows appear there at all.
-  One column per CRM that was actually configured: an unqueried CRM is not a
-  column of "not checked", it is not a column. Both are kept when both are on,
-  because "in HubSpot but not Salesforce" is the answer the tab exists for.
+  Both columns appear only when both CRMs are configured, because "in HubSpot
+  but not Salesforce" is the answer they exist for. With one CRM, a column of
+  its own would say `NO` on every row of a tab whose title already says it, so
+  neither is rendered and the tab's caption names the CRM instead ("Checked
+  against Salesforce."). With none, nothing can be missing from a CRM, and the
+  tab has no rows.
 
-Salesforce is the source of truth for `Title`; HubSpot is the fallback and the
-disagreement between them is itself a flag (`title differs`, `title only in …`).
+Salesforce is the source of truth for `Title`; HubSpot is the fallback. With
+both configured, a disagreement between them is itself a flag (`title differs`,
+`title only in …`). With one, there is nothing to compare, so neither flag
+appears.
 Mobile is presence only — the number is never read into the artifact and is
 redacted to a boolean in the JSON dump.
 
@@ -381,7 +386,11 @@ nothing anywhere else.
 the whole weekly sequence against a real Postgres with the real migrations and
 a stubbed Gong, with **Salesforce and HubSpot deliberately unconfigured** —
 which is how the unconfigured-provider path stays honest rather than
-degrading into "NO" or into a count of 0. The CRM legs are typically unreachable from an agent session and have to be
+degrading into "NO" or into a count of 0. The one-CRM configurations
+(Salesforce only, HubSpot only) and the both-configured one run separately,
+from reconciliation to the HTML view, against stubbed CRM adapters: they assert
+that nothing comparing two CRMs appears unless both are configured. The CRM
+legs themselves are typically unreachable from an agent session and have to be
 verified on a machine that can reach them, by diffing a workbook against a
 known-good run for the same week. Point `QUOROM_TEST_DSN` at a Postgres a test
 may create databases on; without it the database tests skip rather than fail.
