@@ -131,7 +131,7 @@ def test_the_searched_email_on_a_current_position_is_a_match():
     assert got == Person(
         name="Dana Reyes", title="VP Sales", employer_name="Acme",
         employer_domain="acme.example", linkedin="https://www.linkedin.com/in/dana",
-        updated="2026-09-01",
+        updated="2026-09-01", current_jobs=(("acme.example", "Acme", "VP Sales"),),
     )
 
 
@@ -211,3 +211,57 @@ def test_the_check_reports_credits_available():
 
     line = LeadIQ(KEY, post=post).check()
     assert "Active" in line and "1200" in line
+
+
+# --- by LinkedIn URL --------------------------------------------------------- #
+
+
+def test_a_linkedin_lookup_is_accepted_on_the_handle_searched():
+    post = _Post(
+        _people(_record("Ray Oh", "COO", "Hooli", "hooli.example", ["ray@hooli.example"],
+                        linkedin="https://www.linkedin.com/in/Ray-Oh/"))
+    )
+    got = LeadIQ(KEY, post=post).person_by_linkedin("linkedin.com/in/ray-oh?trk=x")
+
+    assert got is not None and got.employer_domain == "hooli.example"
+    # The URL is normalised to the handle before it is sent.
+    assert post.calls[0]["json"]["variables"]["input"] == {
+        "linkedinUrl": "https://www.linkedin.com/in/ray-oh",
+    }
+
+
+def test_a_linkedin_lookup_that_returns_another_profile_is_not_accepted():
+    post = _Post(
+        _people(_record("Someone Else", "EVP", "Other Co", "other.example", [],
+                        linkedin="https://www.linkedin.com/in/someone-else"))
+    )
+    assert LeadIQ(KEY, post=post).person_by_linkedin(
+        "https://www.linkedin.com/in/ray-oh") is None
+
+
+def test_a_url_with_no_profile_handle_is_not_searched():
+    """A Sales Navigator URL, or a CRM value that is not a URL, has nothing to
+    search by — and nothing is spent finding that out."""
+    post = _Post()
+    provider = LeadIQ(KEY, post=post)
+    assert provider.person_by_linkedin("https://www.linkedin.com/sales/people/ACwAA1") is None
+    assert provider.person_by_linkedin("not available in this CRM") is None
+    assert post.calls == []
+
+
+def test_every_current_position_is_kept():
+    """Someone can hold a full-time role and advisory seats at once. All of
+    them are kept, so "still at the company" can ask whether the company is
+    among them rather than whether it is listed first."""
+    record = _record("Dana Reyes", "Advisor", "Board Co", "board.example",
+                     ["dana@acme.example"])
+    record["currentPositions"].append({
+        "title": "VP Sales", "companyInfo": {"name": "Acme", "domain": "acme.example"},
+        "workEmail": None, "emails": [],
+    })
+    got = LeadIQ(KEY, post=_Post(_people(record))).person_by_email("dana@acme.example")
+
+    assert got.current_jobs == (
+        ("board.example", "Board Co", "Advisor"), ("acme.example", "Acme", "VP Sales"),
+    )
+    assert got.job_at("acme.example") == ("acme.example", "Acme", "VP Sales")

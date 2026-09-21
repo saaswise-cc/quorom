@@ -48,8 +48,12 @@ BENCH = {
                 linkedin="https://www.linkedin.com/in/dana-reyes"),
         Contact(name="Lee Park", title="VP Marketing", email="lee@acme.example"),
     ],
-    "globex.example": [Contact(name="Kim Lo", title="CRO", email="kim@globex.example")],
-    "initech.example": [Contact(name="Ray Oh", title="VP Ops", email="ray@initech.example")],
+    # The CRM's LinkedIn URL for Kim points at someone else — the wrong-URL case.
+    "globex.example": [Contact(name="Kim Lo", title="CRO", email="kim@globex.example",
+                               linkedin="https://www.linkedin.com/in/kimlo")],
+    # Ray's email finds nothing; his CRM LinkedIn URL finds him, somewhere else.
+    "initech.example": [Contact(name="Ray Oh", title="VP Ops", email="ray@initech.example",
+                                linkedin="https://linkedin.com/in/ray-oh/")],
 }
 
 IN_CRM = {"dana@acme.example", "lee@acme.example"}
@@ -98,12 +102,18 @@ class _Provider:
 
     def __init__(self):
         self.person_calls: list[str] = []
+        self.linkedin_calls: list[str] = []
         self.company_calls: list[str] = []
         self.people = {
-            # Same employer, a different title.
-            "dana@acme.example": Person(name="Dana Reyes", title="SVP Sales",
-                                        employer_name="Acme", employer_domain="acme.example",
-                                        linkedin="https://www.linkedin.com/in/dana-reyes"),
+            # Still at Acme, with a different title there — but an advisory
+            # seat elsewhere is listed first. Still here, not moved.
+            "dana@acme.example": Person(
+                name="Dana Reyes", title="Advisor", employer_name="Board Co",
+                employer_domain="board.example",
+                linkedin="https://www.linkedin.com/in/dana-reyes",
+                current_jobs=(("board.example", "Board Co", "Advisor"),
+                              ("acme.example", "Acme", "SVP Sales")),
+            ),
             # Moved on.
             "lee@acme.example": Person(name="Lee Park", title="CMO", employer_name="Globex",
                                        employer_domain="globex.example", updated="2026-06-01"),
@@ -123,6 +133,22 @@ class _Provider:
     def person_by_email(self, email):
         self.person_calls.append(email)
         return self.people.get(email)
+
+    # The provider accepts on the handle alone; the name check is the pass's.
+    by_linkedin = {
+        "ray-oh": Person(name="Ray Oh", title="COO", employer_name="Hooli",
+                         employer_domain="hooli.example",
+                         linkedin="https://www.linkedin.com/in/ray-oh"),
+        "kimlo": Person(name="Kimberly Stone", title="CRO", employer_name="Other Co",
+                        employer_domain="other.example",
+                        linkedin="https://www.linkedin.com/in/kimlo"),
+    }
+
+    def person_by_linkedin(self, url):
+        from quorom.enrich import linkedin_handle
+
+        self.linkedin_calls.append(url)
+        return self.by_linkedin.get(linkedin_handle(url))
 
     def company_by_domain(self, domain):
         self.company_calls.append(domain)
@@ -252,10 +278,15 @@ def test_still_at_company_and_differences(tmp_path):
     by = {r["Name"]: r for r in rows}
 
     assert headers[-3:] == ["Still at company?", "Title (Example)", "LinkedIn (Example)"]
+    # Acme is among Dana's current positions, though not listed first.
     assert by["Dana Reyes"]["Still at company?"] == "yes"
     assert by["Lee Park"]["Still at company?"] == "no — now at Globex"
+    # Kim's CRM LinkedIn URL points at someone else: not used, still not found.
     assert by["Kim Lo"]["Still at company?"] == "not found in Example"
-    # Shown only where it differs; the CRM's title stays in Title.
+    # Ray's email found nothing; his LinkedIn URL did, and the name agrees.
+    assert by["Ray Oh"]["Still at company?"] == "no — now at Hooli (matched on LinkedIn)"
+    # Shown only where it differs — and it is the title at *this* company, not
+    # the first one listed. The CRM's title stays in Title.
     assert by["Dana Reyes"]["Title (Example)"] == "SVP Sales"
     assert by["Dana Reyes"]["Title"] == "VP Sales"
     assert by["Dana Reyes"]["LinkedIn (Example)"] in (None, "")
@@ -282,6 +313,11 @@ def test_each_person_and_company_is_looked_up_once_and_inboxes_never(tmp_path):
 
     assert "support@acme.example" not in provider.person_calls
     assert len(provider.person_calls) == len(set(provider.person_calls))
+    # LinkedIn is tried only where the email found nothing and the CRM holds a
+    # URL: Kim and Ray here — never Dana or Lee, whose emails matched.
+    assert sorted(provider.linkedin_calls) == [
+        "https://linkedin.com/in/ray-oh/", "https://www.linkedin.com/in/kimlo",
+    ]
     assert len(provider.company_calls) == len(set(provider.company_calls))
 
 
@@ -296,8 +332,13 @@ def test_the_review_queue_holds_what_a_person_should_settle(tmp_path):
     assert "May have left" in kinds
     assert "Title differs" in kinds
     assert "Headcount or HQ missing" in kinds          # the provider had nothing
-    moved = next(r for r in rows if r["What"] == "May have left")
-    assert moved["Person"] == "Lee Park" and moved["Example says"].startswith("now at Globex")
+    moved = next(r for r in rows if r["What"] == "May have left" and r["Person"] == "Lee Park")
+    assert moved["Example says"].startswith("now at Globex")
+    ray = next(r for r in rows if r["What"] == "May have left" and r["Person"] == "Ray Oh")
+    assert "(matched on LinkedIn)" in ray["Example says"]
+    # A handle match under another name becomes a question, not a finding.
+    wrong = next(r for r in rows if r["What"] == "CRM LinkedIn may be someone else")
+    assert wrong["Person"] == "Kim Lo" and "Kimberly Stone" in wrong["Example says"]
     # The move is the finding; a title at the new company is not a disagreement.
     assert not any(r["What"] == "Title differs" and r["Person"] == "Lee Park" for r in rows)
     # Every row says where to check.
@@ -403,3 +444,43 @@ def test_the_weekly_run_checks_the_provider_first_and_adds_tab_5(
     dump = json.loads(open(paths["json"]).read())
     assert dump["enrichment_provider"] == "Example"
     assert isinstance(dump["review_queue"], list)
+
+
+def test_a_provider_without_a_linkedin_lookup_is_not_asked(tmp_path):
+    """The LinkedIn lookup is optional in the provider interface. Without it,
+    an email miss stays a miss, and nothing else changes."""
+
+    class _EmailOnly:
+        display_name = "Example"
+
+        def __init__(self):
+            self._inner = _Provider()
+
+        def person_by_email(self, email):
+            return self._inner.person_by_email(email)
+
+        def company_by_domain(self, domain):
+            return self._inner.company_by_domain(domain)
+
+    wb, _, _ = _run(tmp_path, _EmailOnly())
+    _, rows = _table(wb["4 - Stakeholder list"])
+    by = {r["Name"]: r for r in rows}
+    assert by["Ray Oh"]["Still at company?"] == "not found in Example"
+    _, queue = _table(wb["5 - Review queue"])
+    assert not any(r["What"] == "CRM LinkedIn may be someone else" for r in queue)
+
+
+@pytest.mark.parametrize(
+    "a, b, agree",
+    [
+        ("Dana Reyes", "Dana Reyes", True),
+        ("Dana M. Reyes", "dana reyes", True),       # middle initial, case
+        ("José Álvarez", "Jose Alvarez", True),       # accents
+        ("Mary-Kate O'Neil", "Mary Kate ONeil", True),   # hyphen, apostrophe
+        ("Dana Reyes", "Dana Rivera", False),
+        ("Dana Reyes", "Kimberly Stone", False),
+        ("", "Dana Reyes", False),
+    ],
+)
+def test_names_agree_on_first_and_last(a, b, agree):
+    assert enrichment.names_agree(a, b) is agree

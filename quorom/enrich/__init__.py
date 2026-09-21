@@ -14,6 +14,16 @@ Each provider is one module in this package exposing `PROVIDER`, a class with:
   person_by_email(email)     -> Person or None
   company_by_domain(domain)  -> Company or None
 
+and optionally:
+
+  person_by_linkedin(url)    -> Person or None, accepted only when the record's
+                                LinkedIn handle is the one searched for
+
+The weekly run tries LinkedIn only when an email lookup finds nothing and the
+CRM holds a LinkedIn URL for the person — an email address goes stale exactly
+when someone changes jobs, and a profile URL usually does not. A provider
+without the method is simply not asked.
+
 Providers are discovered from this package rather than imported by name, so
 nothing outside a provider's own module needs to spell it. That is also how a
 second provider is added: a new module, nothing else.
@@ -27,6 +37,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -47,6 +58,19 @@ class Person:
     # When the provider last refreshed the record, as it reports it. Shown so a
     # reader can weigh a disagreement against how old the provider's view is.
     updated: str = ""
+    # Every current position as (domain, employer name, title). The fields above
+    # are the first of them. A person can hold several at once — a full-time
+    # role and advisory seats — so "is this person still at the company" asks
+    # whether the company is among them, not whether it is listed first.
+    current_jobs: tuple = ()
+
+    def job_at(self, domain: str):
+        """The current position at this domain, or None."""
+        want = (domain or "").strip().lower()
+        for job in self.current_jobs:
+            if job[0] and job[0] == want:
+                return job
+        return None
 
 
 @dataclass(frozen=True)
@@ -55,6 +79,20 @@ class Company:
     domain: str = ""
     employees: Optional[int] = None
     country: str = ""
+
+
+_HANDLE = re.compile(r"linkedin\.com/in/([^/?#\s]+)", re.I)
+
+
+def linkedin_handle(url: str) -> str:
+    """The profile handle in a LinkedIn /in/ URL, lowercased, or "".
+
+    The handle is what identifies a profile; scheme, subdomain, trailing slash
+    and query string are not. A Sales Navigator URL has no public handle and
+    returns "" — it cannot be searched by, or compared with, a profile URL.
+    """
+    m = _HANDLE.search(url or "")
+    return m.group(1).strip().lower().rstrip("/") if m else ""
 
 
 class MoreThanOneProvider(RuntimeError):

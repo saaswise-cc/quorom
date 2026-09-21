@@ -117,7 +117,8 @@ reader needs:
   question gets asked — a company wrongly rejected would otherwise never appear.
 - **`Still at company?`** is the provider's view of where each person works now.
   `no — now at …` is a reason to check, not a conclusion. The row stays on the
-  list either way.
+  list either way. `(matched on LinkedIn)` means the person was found through
+  the LinkedIn URL in your CRM rather than their email — worth the same check.
 - **A provider title or LinkedIn column that is mostly blank is normal.** Those
   columns are filled only where the provider differs from the CRM.
 - **`not found in <provider>`** means it was looked up and the provider has no

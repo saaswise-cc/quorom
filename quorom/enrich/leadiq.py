@@ -16,7 +16,8 @@ the provider's highest confidence score — observed on a real call. Taken at
 face value, that record would report a stakeholder as having moved to a company
 they never worked at. So a person is accepted only when the searched email is
 on the record, in a current or past position; anything else is "not found".
-Companies are held to the same rule on domain.
+A lookup by LinkedIn URL is held to the same rule on the profile handle, and
+companies on domain.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from typing import Callable, Optional
 
 import requests
 
-from . import Company, Person
+from . import Company, Person, linkedin_handle
 
 ENDPOINT = "https://api.leadiq.com/graphql"
 TIMEOUT = 30
@@ -161,16 +162,27 @@ class LeadIQ:
             on_record = set().union(*(_emails(p) for p in current + past)) if current or past else set()
             if email not in on_record:
                 continue  # a different person — see the module docstring
-            job = current[0] if current else {}
-            company = job.get("companyInfo") or {}
-            return Person(
-                name=((record.get("name") or {}).get("fullName") or "").strip(),
-                title=(job.get("title") or "").strip(),
-                employer_name=(company.get("name") or "").strip(),
-                employer_domain=_bare_domain(company.get("domain") or ""),
-                linkedin=((record.get("linkedin") or {}).get("linkedinUrl") or "").strip(),
-                updated=str(record.get("updatedAt") or "")[:10],
-            )
+            return _person(record)
+        return None
+
+    def person_by_linkedin(self, url: str) -> Optional[Person]:
+        """Accepted only when the record's profile handle is the one searched.
+
+        Whether it is the *right* person is a separate question: a CRM's
+        LinkedIn URL can point at someone else. The weekly run checks the name
+        against the CRM's before using the result.
+        """
+        handle = linkedin_handle(url)
+        if not handle:
+            return None
+        data = self._query(
+            PERSON_QUERY, {"input": {"linkedinUrl": f"https://www.linkedin.com/in/{handle}"}}
+        )
+        for record in (data.get("searchPeople") or {}).get("results") or []:
+            found = linkedin_handle((record.get("linkedin") or {}).get("linkedinUrl") or "")
+            if found != handle:
+                continue  # a different profile
+            return _person(record)
         return None
 
     def company_by_domain(self, domain: str) -> Optional[Company]:
@@ -190,6 +202,28 @@ class LeadIQ:
                 country=country.strip(),
             )
         return None
+
+
+def _person(record: dict) -> Person:
+    current = record.get("currentPositions") or []
+    jobs = tuple(
+        (
+            _bare_domain((p.get("companyInfo") or {}).get("domain") or ""),
+            ((p.get("companyInfo") or {}).get("name") or "").strip(),
+            (p.get("title") or "").strip(),
+        )
+        for p in current
+    )
+    first = jobs[0] if jobs else ("", "", "")
+    return Person(
+        name=((record.get("name") or {}).get("fullName") or "").strip(),
+        title=first[2],
+        employer_name=first[1],
+        employer_domain=first[0],
+        linkedin=((record.get("linkedin") or {}).get("linkedinUrl") or "").strip(),
+        updated=str(record.get("updatedAt") or "")[:10],
+        current_jobs=jobs,
+    )
 
 
 PROVIDER = LeadIQ

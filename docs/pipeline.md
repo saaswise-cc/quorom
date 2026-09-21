@@ -354,8 +354,10 @@ including the provider's name, its variable and its cost, in
 `docs/enrichment.md`.
 
 **Reads:** the provider — a company lookup per domain on tab 3, and a person
-lookup per email on tab 4 and on tab 2 (shared inboxes excepted). One lookup per
-email and per domain per run. Never a phone number or a personal email.
+lookup per email on tab 4 and on tab 2 (shared inboxes excepted). For a tab 4
+person the email finds nothing for, a second lookup by the CRM's LinkedIn URL,
+where it holds one. One lookup per email, per LinkedIn URL and per domain per
+run. Never a phone number or a personal email.
 **Cost:** the provider's credits, per `docs/enrichment.md`.
 
 **Read path served:** tab 2 `Name (…)` and `Title (…)`; tab 3 `Employees (…)`,
@@ -373,8 +375,10 @@ person half runs after step 5.
 Three rules shape the output. **A provider value is never written over a CRM
 value** — it is shown beside it, and a disagreement becomes a review-queue row.
 **A result is accepted only if it is the person or company asked about** — the
-searched email on the record, the searched domain on the company — because a
-lookup can return someone else at full confidence. **A miss is stated**, as
+searched email on the record, the searched domain on the company, the searched
+LinkedIn handle on the profile *and* the CRM contact's name on it — because a
+lookup can return someone else at full confidence, and a CRM's LinkedIn URL can
+point at someone else. **A miss is stated**, as
 `not found in <provider>`: never inferred, never blank, never filled from
 another source.
 

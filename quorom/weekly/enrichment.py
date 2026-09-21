@@ -23,15 +23,16 @@ therefore holds disagreements and missing values; it does not certify the rest.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Optional
 
+from ..enrich import linkedin_handle
 from .coverage import meets_profile
 from .people import company_mismatch, missing_from_crm
 from .stakeholders import ICP_NOT_ASSESSED, NO_SENIOR_CONTACT
 
 AGREES = "agrees"
-
-_LINKEDIN_HANDLE = re.compile(r"linkedin\.com/in/([^/?#\s]+)", re.I)
+MATCHED_ON_LINKEDIN = "(matched on LinkedIn)"
 
 
 def not_found(provider) -> str:
@@ -48,8 +49,12 @@ class _Cached:
         self.provider = provider
         self._people: dict = {}
         self._companies: dict = {}
+        self._by_linkedin: dict = {}
         self.people_looked_up = 0
         self.companies_looked_up = 0
+        self.linkedin_looked_up = 0
+        # Optional in the provider interface; a provider without it is not asked.
+        self.can_search_linkedin = hasattr(provider, "person_by_linkedin")
 
     def person(self, email: str):
         key = (email or "").strip().lower()
@@ -57,6 +62,15 @@ class _Cached:
             self._people[key] = self.provider.person_by_email(key) if key else None
             self.people_looked_up += 1 if key else 0
         return self._people[key]
+
+    def person_by_linkedin(self, url: str):
+        handle = linkedin_handle(url)
+        if not handle or not self.can_search_linkedin:
+            return None
+        if handle not in self._by_linkedin:
+            self._by_linkedin[handle] = self.provider.person_by_linkedin(url)
+            self.linkedin_looked_up += 1
+        return self._by_linkedin[handle]
 
     def company(self, domain: str):
         key = (domain or "").strip().lower()
@@ -75,8 +89,24 @@ def _norm(text: str) -> str:
 
 
 def _handle(url: str) -> str:
-    m = _LINKEDIN_HANDLE.search(url or "")
-    return m.group(1).lower().rstrip("/") if m else _norm(url)
+    """For comparing two LinkedIn values: the handle when there is one, the
+    normalised text otherwise."""
+    return linkedin_handle(url) or _norm(url)
+
+
+def _name_tokens(name: str) -> list[str]:
+    plain = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode()
+    # An apostrophe joins ("O'Neil" is "oneil"); any other punctuation separates.
+    plain = re.sub(r"['’]", "", plain.lower())
+    return re.sub(r"[^a-z\s]", " ", plain).split()
+
+
+def names_agree(a: str, b: str) -> bool:
+    """First and last name both agree, ignoring case, accents, punctuation and
+    anything in between. "Dana M. Reyes" agrees with "Dana Reyes"; "Dana Reyes"
+    does not agree with "Dana Rivera"."""
+    x, y = _name_tokens(a), _name_tokens(b)
+    return bool(x and y) and x[0] == y[0] and x[-1] == y[-1]
 
 
 # --- tab 3: companies ------------------------------------------------------ #
@@ -133,27 +163,54 @@ def stakeholders(pass_: _Cached, rows: list[dict]) -> None:
     """
     name = pass_.provider.display_name
     for r in rows:
+        r["matched_on"] = ""
         if r.get("name") in (NO_SENIOR_CONTACT, ICP_NOT_ASSESSED) or not r.get("_email"):
             r["still_at"] = r["other_title"] = r["other_linkedin"] = ""
             continue
         p = pass_.person(r["_email"])
+        suffix = ""
+        if p is not None:
+            r["matched_on"] = "email"
+        else:
+            # The email found nothing. An email goes stale exactly when someone
+            # changes jobs; a profile URL usually does not — so try the CRM's
+            # LinkedIn URL, where it holds one. The provider only accepts its
+            # own handle match; whether that profile is *this* person is
+            # checked here, by name, because a CRM URL can point at someone
+            # else. A handle match under another name is a question for a
+            # person, not a finding about this one.
+            q = pass_.person_by_linkedin(r.get("linkedin") or "")
+            if q is not None and names_agree(r.get("name"), q.name):
+                p, suffix = q, f" {MATCHED_ON_LINKEDIN}"
+                r["matched_on"] = "LinkedIn"
+            elif q is not None:
+                r["linkedin_other_person"] = q.name
         if p is None:
             r["still_at"] = not_found(pass_.provider)
             r["other_title"] = r["other_linkedin"] = ""
             continue
-        if not p.employer_domain:
-            r["still_at"] = f"unclear — no current employer in {name}"
-        elif p.employer_domain == (r.get("domain") or "").lower():
-            r["still_at"] = "yes"
+
+        domain = (r.get("domain") or "").lower()
+        jobs = p.current_jobs or ((p.employer_domain, p.employer_name, p.title),)
+        here = p.job_at(domain) if p.current_jobs else (jobs[0] if jobs[0][0] == domain else None)
+        if here:
+            # Among their current positions, even if not the first listed: a
+            # full-time role elsewhere plus a seat here is still "here".
+            r["still_at"] = "yes" + suffix
+            title_here = here[2]
+        elif not any(j[0] for j in jobs):
+            r["still_at"] = f"unclear — no current employer in {name}" + suffix
+            title_here = ""
         else:
-            r["still_at"] = f"no — now at {p.employer_name or p.employer_domain}"
+            first = next(j for j in jobs if j[0])
+            r["still_at"] = f"no — now at {first[1] or first[0]}" + suffix
+            # Someone who has moved holds a title somewhere else. Setting it
+            # beside the CRM's would read as a disagreement about this job; the
+            # move is the finding, and it is already stated.
+            title_here = ""
         r["other_updated"] = p.updated
-        # Someone who has moved holds a title somewhere else. Setting it beside
-        # the CRM's would read as a disagreement about this job; the move is the
-        # finding, and it is already stated.
-        moved = r["still_at"].startswith("no —")
         r["other_title"] = (
-            p.title if p.title and not moved and _norm(p.title) != _norm(r.get("title")) else ""
+            title_here if title_here and _norm(title_here) != _norm(r.get("title")) else ""
         )
         crm_linkedin = r.get("linkedin") or ""
         r["other_linkedin"] = (
@@ -188,6 +245,7 @@ QUEUE_ORDER = (
     "Profile fit disputed",
     "Headcount or HQ missing",
     "May have left",
+    "CRM LinkedIn may be someone else",
     "Account may be linked to the wrong company",
     "Title differs",
     "LinkedIn differs",
@@ -232,6 +290,10 @@ def review_queue(pass_: _Cached, coverage: list[dict], rows: list[dict]) -> list
                 "The account's Website field in the CRM")
 
     for r in rows:
+        if r.get("linkedin_other_person"):
+            add("CRM LinkedIn may be someone else", r.get("company", ""), r.get("name", ""),
+                r.get("linkedin") or "", f"profile at that URL is {r['linkedin_other_person']}",
+                "Open the CRM's LinkedIn URL")
         if not r.get("still_at") or r.get("still_at") == not_found(pass_.provider):
             continue
         who = r.get("name", "")

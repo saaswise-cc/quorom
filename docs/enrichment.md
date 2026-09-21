@@ -65,7 +65,7 @@ credits available:
 | Where | Looked up by | Compared |
 |---|---|---|
 | Tab 3 — Company coverage | domain | employee count and HQ country, through your ICP test |
-| Tab 4 — Stakeholder list | email | current employer, title, LinkedIn URL |
+| Tab 4 — Stakeholder list | email; then the CRM's LinkedIn URL, if the email finds nothing | current employer, title, LinkedIn URL |
 | Tab 2 — Missing from CRM | email | name and title |
 
 Each person and each company is looked up once per run, whichever tab asks
@@ -89,15 +89,34 @@ they never worked at.
 So a person is accepted only when the email searched for is on the record, in a
 current or past position. A past position counts: the address in your CRM is
 often the one they left behind, and the record's current employer is then the
-finding. Anything else reads **"not found in LeadIQ"**. Companies are held to
-the same rule on domain.
+finding. Companies are held to the same rule on domain.
 
-**Whether a move is caught depends on the provider keeping old addresses.** Not
-every record lists emails against past positions — one real record checked had
-none. Where it does not, a person whose CRM address is the one they left behind
-reads `not found in LeadIQ` rather than `no — now at …`. That is the safe way to
-miss: it never reports a move that did not happen. How often it happens is
-visible in any run as the count of `not found` rows on tab 4.
+### When the email finds nothing, the CRM's LinkedIn URL is tried
+
+An email address goes stale exactly when someone changes jobs — the event this
+check exists to catch — and the provider does not always keep the old address
+on its record. A LinkedIn profile URL usually survives the move. So when the
+email lookup finds nothing and the CRM holds a LinkedIn URL for the person, the
+run searches by that URL. The result is used only if **both**:
+
+- the record's profile handle (the part after `/in/`) is the one searched, and
+- its first and last name agree with the CRM contact's, ignoring case, accents,
+  punctuation and middle names.
+
+The second check is there because a CRM's LinkedIn URL can point at someone
+else. A handle match under a different name is not used; it becomes a review
+queue row instead — **CRM LinkedIn may be someone else** — for a person to
+open. Rows found this way say so: `… (matched on LinkedIn)`.
+
+The email lookup always runs first and its rule does not change. Where the email
+is accepted, a LinkedIn search would return the same record, so it is not made.
+
+On one real week, 18 stakeholders were not found by email. 15 of them had a
+LinkedIn URL in the CRM; for 13 of those, the URL search returned the same
+handle under the same name. Anything still unmatched reads
+**"not found in LeadIQ"** — never inferred, never filled from elsewhere. The run
+log states each week how many stakeholders were matched on email and how many on
+LinkedIn.
 
 ---
 
@@ -131,9 +150,14 @@ company your CRM rejects and the provider would accept is put on tab 4 as
 
 | Column | Values |
 |---|---|
-| `Still at company?` | `yes` · `no — now at <company>` · `unclear — no current employer in LeadIQ` · `not found in LeadIQ` |
+| `Still at company?` | `yes` · `no — now at <company>` · `unclear — no current employer in LeadIQ` · `not found in LeadIQ`, with `(matched on LinkedIn)` added where the match came from the CRM's LinkedIn URL |
 | `Title (LeadIQ)` | Filled **only where it differs** from the CRM's title — and left blank for someone who has moved, whose provider title is for a different job |
 | `LinkedIn (LeadIQ)` | Filled **only where it differs** from the CRM's URL |
+
+**`yes` means the company is among the person's current positions**, not that
+it is listed first. Someone with a full-time role plus advisory seats is still
+at each of them; `no — now at …` means the company is in none of their current
+positions. The provider title shown is the one for this company.
 
 A detected move flags the row; it never removes it. The CRM record is still
 what you have, and a name vanishing without explanation is worse than a name
@@ -148,6 +172,7 @@ check and where:
 | Profile fit disputed | The two sources give different ICP answers |
 | Headcount or HQ missing | Either source lacks the employee count or HQ the ICP test needs |
 | May have left | The provider places the person at a different company |
+| CRM LinkedIn may be someone else | The CRM's LinkedIn URL leads to a profile under a different name |
 | Account may be linked to the wrong company | The CRM account's name does not resemble the domain it was reached through |
 | Title differs | The provider's title differs from the CRM's |
 | LinkedIn differs | The provider's LinkedIn URL differs from the CRM's |
@@ -185,11 +210,18 @@ This module never selects a phone number, so a person lookup costs at most the
 record.
 
 **A week's spend at rate-card prices, from one real week's counts** (33
-companies met, about 45 people on the stakeholder list and 19 not in the CRM):
-about 65 credits for person records, plus about 100 if company lookups are
-charged at 3 — so **at most about 165 a week**, and possibly far less. An
-estimate, not a measurement: compare the `account` query's `used` before and
-after your first enriched run.
+companies met, 40 people on the stakeholder list and 19 not in the CRM): about
+60 person lookups by email and 15 by LinkedIn URL — the second only for people
+the email missed — plus 33 company lookups. That is about 75 credits for person
+records, plus about 100 if company lookups are charged at 3: **at most about 175
+a week**, and possibly far less. An estimate, not a measurement.
+
+**Measuring it yourself: the balance may be shared.** The `account` query
+reports the plan's balance, and on a plan shared by a whole company everyone
+else's usage moves it too. A before-and-after comparison over a full run —
+minutes, not seconds — can include other people's spending; on one real trial
+it did not line up with the run's own lookups. Compare over a short window, or
+ask the provider for per-key usage.
 
 ---
 
