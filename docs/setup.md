@@ -910,7 +910,7 @@ WEEK_START=2026-08-17 quorom weekly
 It writes into `OUTPUT_DIR` and nowhere else — no writes back to Gong,
 Salesforce, HubSpot or anywhere in your CRM:
 
-- `weekly_stakeholder_map_<week>.xlsx` — the artifact, four tabs (five with
+- `weekly_stakeholder_map_<week>.xlsx` — the artifact, three tabs (four with
   an enrichment provider configured)
 - `stakeholder_inputs_<week>.json` — every input the run read
 - `weekly_view_<week>.html` — a single-page view of the same thing
@@ -954,11 +954,10 @@ The tabs:
 
 | Tab | What it answers |
 |---|---|
-| **1 — Met this week** | Who attended from outside, one row per person, with their CRM title, LinkedIn and whether a mobile number is on file |
-| **2 — Missing from CRM** | Which of those people are not in Salesforce or HubSpot. Attendees with neither email nor domain (meeting bots) are listed at the foot — suppressed visibly, not dropped. |
-| **3 — Company coverage** | Every external company met: size, HQ, whether it meets your profile, how many contacts you hold |
-| **4 — Stakeholder list** | The map. The senior people at the ICP-fit companies worth considering, capped at `SHORTLIST_SIZE` each |
-| **5 — Review queue** | Only with an enrichment provider configured: where your CRM and the provider disagree, for a person to settle. The provider's values also appear beside the CRM's on tabs 2, 3 and 4 — `docs/enrichment.md` |
+| **1 — Met this week** | Who attended from outside, one row per person: whether each is in your CRM, and for those who are, their CRM title, LinkedIn and whether a mobile number is on file. People not in the CRM are listed first, with `—` in the CRM columns — there is no record to read. Attendees with neither email nor domain (meeting bots) are listed at the foot — suppressed visibly, not dropped. |
+| **2 — Company coverage** | Every external company met: size, HQ, whether it meets your profile, how many contacts you hold |
+| **3 — Stakeholder list** | The map. The senior people in your CRM at the ICP-fit companies worth considering, capped at `SHORTLIST_SIZE` each. Its caption states the rule in your profile's terms |
+| **4 — Review queue** | Only with an enrichment provider configured: where your CRM and the provider disagree, for a person to settle. The provider's values also appear beside the CRM's on tabs 1, 2 and 3 — `docs/enrichment.md` |
 
 **`docs/reading-your-first-run.md` is what to send to whoever receives this
 file.** It covers what to check first to know the run worked, what looks
@@ -981,7 +980,7 @@ for the reader of the map rather than for whoever stood the deployment up.
 - **Nobody is checked for still being at the company** unless an enrichment
   provider is configured. CRM contacts go stale; without a provider the column
   is absent rather than saying "not checked" on every row. With one, it is
-  `Still at company?` on tab 4 — the provider's view, which can be stale too.
+  `Still at company?` on tab 3 — the provider's view, which can be stale too.
 
 ---
 

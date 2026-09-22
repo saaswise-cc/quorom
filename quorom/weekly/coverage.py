@@ -1,7 +1,7 @@
 """Step 4 — company coverage. Triage: which companies warrant a map.
 
-Serves every column of tab 3, and the ICP filter that decides which companies
-reach tab 5's stakeholder list.
+Serves every column of tab 2, and the ICP filter that decides which companies
+reach tab 3's stakeholder list.
 """
 
 from __future__ import annotations
@@ -27,6 +27,22 @@ SENIORITY_KEYWORDS = {
     "founder": ["Founder", "Owner"],
     "manager": ["Manager"],
 }
+
+# How each focus-profile level reads in a sentence, for the stakeholder list's
+# caption. Anything not listed is shown as the profile holds it.
+_LEVEL_PROSE = {
+    "cro": "CRO", "cxo": "C-suite", "c-level": "C-suite", "vp": "VP",
+    "director": "Director", "founder": "Founder", "manager": "Manager",
+}
+
+
+def seniority_prose(profile: dict) -> str:
+    """The profile's seniority levels as a reader would say them: "CRO, VP or
+    Director". With none set, the default the bench query uses."""
+    levels = [str(x).strip() for x in (profile or {}).get("focus_seniority") or [] if str(x).strip()]
+    words = [_LEVEL_PROSE.get(x.lower(), x) for x in levels] or ["C-suite", "VP", "Director"]
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " or " + words[-1]
+
 
 def seniority_terms(profile: dict) -> list[str]:
     terms: list[str] = []
@@ -54,12 +70,12 @@ def meets_profile(
     Without that third state, an unconfigured CRM returns empty strings here
     and every company fails on "no size": a judgement asserted about data
     nobody looked up. It is not cosmetic, because this test is also the filter
-    feeding tab 4, so the same absence silently empties the stakeholder list —
+    feeding tab 3, so the same absence silently empties the stakeholder list —
     the mirror image of the MissingFocusProfile failure in `weekly/run.py`,
     where an absent profile makes the test pass everything instead.
 
     None is the idiom the rest of the pipeline already uses for "not checked":
-    `in_salesforce`, `linkedin_in_crm` and tab 3's contact counts all use it,
+    `in_salesforce`, `linkedin_in_crm` and tab 2's contact counts all use it,
     for exactly this reason.
 
     `country` is the HQ country on its own, not the joined display string. The
@@ -167,7 +183,7 @@ def build_coverage(
                 # Three states, kept apart. `is_target` is a CONFIRMED target,
                 # so it is False both for a company that failed the test and for
                 # one the test could not run on — which is why filtering on it
-                # alone drops the second kind out of tab 4 entirely. `assessed`
+                # alone drops the second kind out of tab 3 entirely. `assessed`
                 # is what tells them apart; see stakeholders.companies_for_map.
                 "assessed": assessed,
                 "is_target": bool(ok) and not customer,

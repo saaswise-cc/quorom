@@ -1,9 +1,9 @@
 """Steps 2 and 3 — distinct people, and their reconciliation against the CRM.
 
 Step 2 serves: one row per person on tab 1 rather than one per meeting attended,
-and the company keys tabs 3 and 4 are built on.
-Step 3 serves: tab 1's Title / LinkedIn? / Mobile in CRM? / Flag, and tab 2's
-In HubSpot? / In Salesforce?.
+and the company keys tabs 2 and 3 are built on.
+Step 3 serves: tab 1's in-CRM column(s), Title / LinkedIn? / Mobile in CRM? /
+Flag, and the order of its rows.
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ def person_flag(name: Optional[str], email: Optional[str]) -> str:
     `amer-bdr@` as "AMER BDR", and a real person's name can sit on a shared
     `jobs@` address — and treating a name as proof of a person meant the
     shared-inbox flag never fired for either. "Is this someone to add to the
-    CRM" is the question tab 2 exists to answer, so getting it wrong there is
-    the whole column being wrong.
+    CRM" is the question tab 1's in-CRM column answers, so getting it wrong
+    there is the whole column being wrong.
     """
     if email:
         tokens = re.split(r"[._-]", email.split("@", 1)[0].lower())
@@ -51,7 +51,7 @@ def suppress_non_contacts(rows: list[dict]) -> tuple[list[dict], list[str]]:
     """Meeting bots and tools have neither email nor domain — nothing to act on.
 
     Suppressed visibly: the names come back so the workbook can list them at the
-    foot of tab 2 rather than quietly dropping them.
+    foot of tab 1 rather than quietly dropping them.
     """
     suppressed = sorted(
         {(r.get("attendee_name") or "(unnamed)") for r in rows if not (r.get("email") and r.get("domain"))}
@@ -95,7 +95,7 @@ def dedupe_people(rows: list[dict]) -> list[dict]:
 # Do NOT hard-exclude companies by domain. "Companies met this week" legitimately
 # includes both customers and vendors — gong.io and hubspot.com are both. Whether
 # a company is a fresh engagement target is an account-type question answered
-# on tab 3, not by dropping the row here.
+# on tab 2, not by dropping the row here.
 def group_companies(people: list[dict]) -> dict[str, dict]:
     companies: dict[str, dict] = {}
     for p in people:
@@ -105,20 +105,28 @@ def group_companies(people: list[dict]) -> dict[str, dict]:
 
 
 def missing_from_crm(row: dict) -> bool:
-    """Does this reconciled person belong on tab 2?
+    """Is this reconciled person missing from a CRM that was asked?
 
-    Asked in two places — the workbook, and the enrichment pass that looks
-    these people up — so it is asked here once. None is "not checked" and never
-    counts: only a CRM that was asked and said no puts a person on the tab.
+    Asked in several places — the workbook's ordering, the enrichment pass that
+    looks these people up, and the summary's count — so it is asked here once.
+    None is "not checked" and never counts: only a CRM that was asked and said
+    no makes a person missing. With both CRMs configured, missing from either
+    counts: "in HubSpot but not Salesforce" is a gap too.
     """
     return row.get("in_hubspot") is False or row.get("in_salesforce") is False
+
+
+def in_any_crm(row: dict) -> bool:
+    """Does any configured CRM hold a record for this person? The CRM-derived
+    columns read that record, so without one they have nothing to report."""
+    return row.get("in_hubspot") is True or row.get("in_salesforce") is True
 
 
 def company_mismatch(domain: Optional[str], crm_company: Optional[str]) -> bool:
     """Does the CRM account's name look unrelated to the domain it was reached
     through?
 
-    Read by the review queue (tab 5, `weekly/enrichment.py`) and nowhere else —
+    Read by the review queue (tab 4, `weekly/enrichment.py`) and nowhere else —
     as a question for a person, never as a Flag value. The map reaches an account
     through its Website field, so one wrong value there pulls another company's
     contacts in under it; no lookup fixes that, only someone correcting the
@@ -143,7 +151,7 @@ def _linkedin_presence(sf: Salesforce, contact: Optional[Contact]):
 
     That last one used to answer False, which rendered as a blank cell
     indistinguishable from "we looked and they have no LinkedIn". This
-    function's own docstring named that as the conflation tab 2 had fixed, and
+    function's own docstring named that as the conflation the old gap tab had fixed, and
     deferred it. It is no longer deferred.
     """
     if not sf.configured:
@@ -177,7 +185,7 @@ def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
     # for, while the CRM record this function just fetched has one. Taking the
     # title from that record and not the name reported "needs name" for people
     # the run had already looked up and could see — the same person appearing
-    # blank on tab 1 and correctly named on tab 4. Salesforce wins, HubSpot is
+    # blank on tab 1 and correctly named on tab 3. Salesforce wins, HubSpot is
     # the fallback, same precedence as the title beside it.
     crm_name = (sf_rec.name if sf_rec else "") or (hs_rec.name if hs_rec else "")
     name = person.get("attendee_name") or crm_name
@@ -190,12 +198,14 @@ def reconcile(person: dict, sf: Salesforce, hs: HubSpot) -> dict:
         missing = []
         if not (name and str(name).strip()):
             missing.append("name")
-        # A missing title is only a finding if a CRM was asked for one. With no
-        # CRM configured `title` is empty for everyone, and flagging "needs
+        # A missing title is only a finding about a CRM record that exists. With
+        # no CRM configured `title` is empty for everyone, and flagging "needs
         # title" on every named attendee reports a gap in a system that was
-        # never consulted. The name check stays either way — that comes from the
-        # meeting, not the CRM.
-        if crm_queried and not title:
+        # never consulted. With no record for this person, the finding is that
+        # they are not in the CRM at all — the in-CRM column says so — not that
+        # a record lacks a title. The name check stays either way: it comes from
+        # the meeting, not the CRM.
+        if crm_queried and not title and (sf_rec or hs_rec):
             missing.append("title")
         if missing:
             flags.append("needs " + " + ".join(missing))

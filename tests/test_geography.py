@@ -147,7 +147,7 @@ def test_the_icp_test_does_not_judge_data_it_never_fetched():
     company — "no size; HQ unknown". Empty firmographics because no CRM was
     ever called is not a finding at all, and returning False for it states a
     verdict about data nobody looked up. Worse, this test is also the filter
-    feeding tab 4, so a False here silently empties the stakeholder map.
+    feeding tab 3, so a False here silently empties the stakeholder map.
     """
     from quorom.weekly.coverage import NOT_ASSESSED
 

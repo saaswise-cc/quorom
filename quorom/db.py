@@ -26,8 +26,8 @@ def connect(cfg: Config) -> Iterator[psycopg.Connection]:
 
 # --- Step 1 — the week's external attendees -------------------------------- #
 #
-# Serves: which rows exist on tab 1 (Met this week) and tab 2 (Missing from
-# CRM) at all, plus Name, Email, Company (domain) and the meeting titles.
+# Serves: which rows exist on tab 1 (Met this week) at all, plus Name, Email,
+# Company (domain) and the meeting titles.
 
 WEEK_ATTENDEES_SQL = """
 select m.id           as meeting_id,
@@ -59,7 +59,7 @@ def week_attendees(conn: psycopg.Connection, cfg: Config) -> list[dict]:
 
 # --- Step 5 — all-time external meeting history ---------------------------- #
 #
-# Serves: 'Recent contact?' on tab 4. All-time, not the week — which is why the
+# Serves: 'Recent contact?' on tab 3. All-time, not the week — which is why the
 # importer persists meetings rather than the pipeline paging Gong on each run.
 #
 # The meeting-size columns are what separate a relationship from an audience
@@ -113,8 +113,8 @@ def met_history(
 
 # --- Step 4 — the account's focus profile ---------------------------------- #
 #
-# Serves: the ICP filter (employee band + HQ geography) on tab 3, and the
-# seniority terms behind the senior CRM bench on tab 4.
+# Serves: the ICP filter (employee band + HQ geography) on tab 2, and the
+# seniority terms behind the senior CRM bench on tab 3.
 #
 # Read from the same connection as the meeting data, which is what makes moving
 # a deployment to a different database a connection-string change.

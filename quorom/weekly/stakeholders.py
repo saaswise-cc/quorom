@@ -1,7 +1,7 @@
 """Step 5 — the stakeholder list. The map: which specific people at the companies
 that passed triage.
 
-Serves all six columns of tab 4: Company, Name, Title, Recent contact?, LinkedIn,
+Serves all six columns of tab 3: Company, Name, Title, Recent contact?, LinkedIn,
 Mobile in CRM?.
 
 Ordering is two rules and no weighting: most senior first, recent contact
@@ -99,7 +99,7 @@ def recent_contact(cfg: Config, history: Optional[dict], last_activity) -> str:
 
 NO_SENIOR_CONTACT = "— no senior contact in Salesforce —"
 
-# Tab 4 when the ICP test could not run at all. An empty tab reads as "no
+# Tab 3 when the ICP test could not run at all. An empty tab reads as "no
 # targets this week", which is a finding a reader would act on; this says the
 # test never ran. Same shape as the row above, for the same reason: the reader
 # needs to see the difference between looking and finding nothing, and not
@@ -108,7 +108,7 @@ ICP_NOT_ASSESSED = "— ICP not assessed: no CRM configured —"
 
 
 def companies_for_map(coverage: list[dict]) -> list[dict]:
-    """The companies tab 4 shows: confirmed targets, every company whose ICP
+    """The companies tab 3 shows: confirmed targets, every company whose ICP
     test could not run, and every company whose verdict an enrichment provider
     disputes.
 
@@ -137,7 +137,7 @@ def build(
     history: dict[str, dict],
     sf: Salesforce,
 ) -> tuple[list[dict], list[dict]]:
-    """-> (rows for tab 4, the raw bench for the JSON dump)."""
+    """-> (rows for tab 3, the raw bench for the JSON dump)."""
     rows: list[dict] = []
     raw: list[dict] = []
 

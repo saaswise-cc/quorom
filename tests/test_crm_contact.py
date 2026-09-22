@@ -182,16 +182,16 @@ def test_a_name_the_crm_holds_is_not_reported_missing():
     the CRM knows by name. The row already takes its *title* from that record,
     so reporting "needs name" beside it was the run calling something missing
     that it had in hand — and the same person appeared blank on tab 1 while
-    correctly named on tab 4."""
+    correctly named on tab 3."""
     from quorom.weekly.people import reconcile
 
     got = reconcile(
         {"email": "m@acme.com", "attendee_name": "", "flag": "needs enrichment"},
-        _Stub(Contact(name="Martina Taverna", title="VP Sales")),
+        _Stub(Contact(name="Robin Hale", title="VP Sales")),
         _Stub(None),
     )
 
-    assert got["attendee_name"] == "Martina Taverna"
+    assert got["attendee_name"] == "Robin Hale"
     assert "needs name" not in got["flag"]
 
     # Salesforce wins, HubSpot is the fallback — the same precedence as title.
@@ -209,6 +209,21 @@ def test_a_name_the_crm_holds_is_not_reported_missing():
         _Stub(None),
     )
     assert "needs name" in nowhere["flag"]
+
+
+def test_needs_title_is_about_a_record_that_exists():
+    """A missing title is a finding about a CRM record. Someone with no record
+    is not in the CRM at all — the in-CRM column says so — and flagging
+    "needs title" beside that reported a gap in a record that does not exist."""
+    from quorom.weekly.people import reconcile
+
+    person = {"email": "a@b.com", "attendee_name": "A", "flag": ""}
+    no_record = reconcile(person, _Stub(None), _Stub(None, configured=False))
+    assert "needs title" not in no_record["flag"]
+    assert no_record["in_salesforce"] is False
+
+    thin_record = reconcile(person, _Stub(Contact(title="")), _Stub(None, configured=False))
+    assert "needs title" in thin_record["flag"]
 
 
 @pytest.mark.parametrize(

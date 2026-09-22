@@ -19,10 +19,10 @@ which legs actually ran.
    not appear. If they do, your account's internal domains are wrong. If the tab
    is empty, the week window found no meetings — check the window before
    concluding anything about the data.
-2. **Does tab 3 have employee counts and HQs?** If those columns are populated,
+2. **Does tab 2 have employee counts and HQs?** If those columns are populated,
    your CRM leg ran. If `Meets profile` is blank on every row, it did not, and
-   nothing on tab 4 means what it looks like it means.
-3. **Does tab 4 have people on it?** If it carries a single explanatory row
+   nothing on tab 3 means what it looks like it means.
+3. **Does tab 3 have people on it?** If it carries a single explanatory row
    instead, no company passed the filter. That is a real answer sometimes — but
    check point 2 first, because an unassessed company cannot pass a filter it
    was never tested against.
@@ -48,26 +48,33 @@ quietly improving it.
 partners all end up in a meeting recorder. The run does not know which meetings
 were commercial.
 
-**Tab 4 much shorter than tab 3.** Expected. Tab 3 is every company met; tab 4
-is the ones that fit your profile, capped at `SHORTLIST_SIZE` people each.
+**Tab 3 much shorter than tab 2.** Expected. Tab 2 is every company met; tab 3
+is the ones that fit your profile, capped at `SHORTLIST_SIZE` people each, and
+only people already in your CRM. The caption at the top of tab 3 states the
+rule in your profile's own terms.
+
+**Dashes in the CRM columns on tab 1.** A person with no CRM record has no
+title, LinkedIn or mobile *in the CRM* to report, so those cells read `—`
+rather than `no`. They are listed first on tab 1 — that is the not-in-CRM list.
 
 **`— no senior contact in Salesforce —` rows.** A company that fits your ICP
 where the CRM holds nobody senior. That is a stated gap rather than an omission,
 and it is usually the most useful line in the file.
 
-**Meeting bots and notetakers at the foot of tab 2.** Attendees with neither an
+**Meeting bots and notetakers at the foot of tab 1.** Attendees with neither an
 email nor a domain are suppressed there visibly rather than dropped, so you can
 see what was removed.
 
 ## What actually indicates something is wrong
 
-- **Every row on tab 1 reading `no` under `Mobile in CRM?` and blank under
-  `LinkedIn?`.** Your CRM leg is not reaching your data. If no CRM were
-  configured those columns would not be there at all, so seeing them empty on
-  every row means one was configured and is answering with nothing.
+- **Every person on tab 1 showing as not in the CRM.** Your CRM leg is not
+  reaching your data. If no CRM were configured the in-CRM column would not be
+  there at all, so `NO` on every row means one was configured and is
+  answering with nothing. The same goes for every person who *is* in the CRM
+  reading `no` under `Mobile in CRM?` and blank under `LinkedIn?`.
 - **Companies you know are large showing no employee count.** A company with no
   count is excluded from the map entirely rather than given the benefit of the
-  doubt, so this silently shrinks tab 4.
+  doubt, so this silently shrinks tab 3.
 - **`HQ unknown` where you know the HQ.** `HQ unknown` and `HQ not in region`
   are different rows: the first is missing data, the second is a decision your
   profile made.
@@ -88,12 +95,12 @@ happens in your own systems.
 
 | What you see | What it means | What a person does |
 |---|---|---|
-| Met, not in CRM | Somebody your team spoke to has no record | Decide whether they belong there, then add them. This is the most directly actionable thing in the file. |
+| Met, not in CRM (top of tab 1) | Somebody your team spoke to has no record | Decide whether they belong there, then add them. This is the most directly actionable thing in the file. |
 | In CRM, no title | The record exists but is thin | Fill it in at the source, so next week's run reads it |
 | Company met, no employee count | Excluded from the map entirely | Fill the firmographics if the company matters to you |
 | Fits profile, no senior contact | The stakeholder gap | Find who the senior people there are. This is where a data provider or a browser extension earns its place, and it is a person's step, not a pipeline's. |
 | Fits profile, senior contacts present | The map did its job | Decide who is worth approaching |
-| A row on tab 5, the review queue | Your CRM and the enrichment provider disagree, or one is missing a value | Check the place the row names — usually LinkedIn — and correct whichever source is wrong. Only with a provider configured. |
+| A row on tab 4, the review queue | Your CRM and the enrichment provider disagree, or one is missing a value | Check the place the row names — usually LinkedIn — and correct whichever source is wrong. Only with a provider configured. |
 
 **No action is suggested per person, deliberately.** The output says who is
 worth considering and stops. Outreach is a sequence — connect, perhaps message,
@@ -106,24 +113,26 @@ preferable to one that says "not checked" on every row.
 
 ## If an enrichment provider is configured
 
-The provider's values sit **beside** the CRM's on tabs 2, 3 and 4, and a fifth
+The provider's values sit **beside** the CRM's on tabs 1, 2 and 3, and a fourth
 tab lists where they disagree. `docs/enrichment.md` has the detail; what a
 reader needs:
 
 - **Neither source is the truth.** The provider can be out of date as easily as
   the CRM. LinkedIn settles a disagreement. The two agreeing is not proof either.
-- **`(profile disputed)` beside a company on tab 4** means the CRM and the
+- **`(profile disputed)` beside a company on tab 3** means the CRM and the
   provider give different answers to your ICP test. It is on the list so the
   question gets asked — a company wrongly rejected would otherwise never appear.
 - **`Still at company?`** is the provider's view of where each person works now.
   `no — now at …` is a reason to check, not a conclusion. The row stays on the
   list either way. `(matched on LinkedIn)` means the person was found through
   the LinkedIn URL in your CRM rather than their email — worth the same check.
-- **A provider title or LinkedIn column that is mostly blank is normal.** Those
-  columns are filled only where the provider differs from the CRM.
+- **A provider title or LinkedIn column that is mostly blank is normal.** On
+  tab 3 those columns are filled only where the provider differs from the CRM;
+  on tab 1, only for people not in the CRM — which is what gives them a name,
+  title and LinkedIn to act on.
 - **`not found in <provider>`** means it was looked up and the provider has no
   record. It is not a verdict about the person or company.
-- **Tab 5 is the work.** Every row says what to check and where. Nothing in it
+- **Tab 4 is the work.** Every row says what to check and where. Nothing in it
   has been changed anywhere — the CRM is updated by whoever works through it.
 
 ## Why the second run is worth more than the first

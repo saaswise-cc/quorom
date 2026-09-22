@@ -75,7 +75,7 @@ SPECS: dict[str, tuple[FieldSpec, ...]] = {
     "Account": (
         FieldSpec(
             logical="employee_count",
-            serves="tab 3 'Employees', and the ICP employee band",
+            serves="tab 2 'Employees', and the ICP employee band",
             include=r"employee|headcount|staff",
             # A range, a band or a percentage of headcount is not a headcount.
             # Seen in the wild: a double field labelled '20% of Employees'.
@@ -85,7 +85,7 @@ SPECS: dict[str, tuple[FieldSpec, ...]] = {
         ),
         FieldSpec(
             logical="hq_country",
-            serves="tab 3 'HQ', and the ICP geography test",
+            serves="tab 2 'HQ', and the ICP geography test",
             # Shipping is a delivery address, not a head office. A *Code field
             # holds 'US' where its sibling holds 'United States' — a different
             # value space, and mixing the two is how a country list stops
@@ -97,14 +97,14 @@ SPECS: dict[str, tuple[FieldSpec, ...]] = {
         ),
         FieldSpec(
             logical="hq_city",
-            serves="tab 3 'HQ' (display only)",
+            serves="tab 2 'HQ' (display only)",
             include=r"city",
             exclude=r"code|shipping|other\b|mailing",
             types=TEXT,
         ),
         FieldSpec(
             logical="hq_state",
-            serves="tab 3 'HQ' (display only)",
+            serves="tab 2 'HQ' (display only)",
             # Word-bounded: 'Value Statements' and 'Status Info' both contain
             # the letters of 'state' and neither is one.
             include=r"\bstate\b|\bprovince\b",
@@ -115,7 +115,7 @@ SPECS: dict[str, tuple[FieldSpec, ...]] = {
     "Contact": (
         FieldSpec(
             logical="linkedin_url",
-            serves="tab 1 'LinkedIn?' and tab 4 'LinkedIn'",
+            serves="tab 1 'LinkedIn?' and tab 3 'LinkedIn'",
             # The person's profile URL. Not the company's page, not a scraped
             # bio, not a location string, not a boolean 'uses LinkedIn'.
             include=r"linked_?in",

@@ -3,11 +3,11 @@
 Runs only when an enrichment provider is configured (see `quorom/enrich/`), and
 changes nothing when one is not. Serves:
 
-  tab 2  Name (provider), Title (provider) — for people not in the CRM
-  tab 3  Employees (provider), HQ (provider), Profile check
-  tab 4  Still at company?, Title (provider), LinkedIn (provider), and which
+  tab 1  Name, Title and LinkedIn (provider) — for people not in the CRM
+  tab 2  Employees (provider), HQ (provider), Profile check
+  tab 3  Still at company?, Title (provider), LinkedIn (provider), and which
          companies reach the map at all (a disputed verdict does)
-  tab 5  the review queue
+  tab 4  the review queue
 
 Three sources, and none is the truth. The CRM is what the customer has; the
 provider is a second opinion that can be stale too; LinkedIn is what a person
@@ -43,7 +43,7 @@ def not_found(provider) -> str:
 
 class _Cached:
     """One lookup per email and per domain per run, whichever tab asks first.
-    A person on tab 2 and tab 4 is one credit, not two."""
+    A person on tab 1 and tab 3 is one credit, not two."""
 
     def __init__(self, provider) -> None:
         self.provider = provider
@@ -109,7 +109,7 @@ def names_agree(a: str, b: str) -> bool:
     return bool(x and y) and x[0] == y[0] and x[-1] == y[-1]
 
 
-# --- tab 3: companies ------------------------------------------------------ #
+# --- tab 2: companies ------------------------------------------------------ #
 
 
 def companies(pass_: _Cached, coverage: list[dict], profile: dict) -> None:
@@ -149,7 +149,7 @@ def companies(pass_: _Cached, coverage: list[dict], profile: dict) -> None:
             c["disputed"] = True
 
 
-# --- tab 4: stakeholders --------------------------------------------------- #
+# --- tab 3: stakeholders --------------------------------------------------- #
 
 
 def stakeholders(pass_: _Cached, rows: list[dict]) -> None:
@@ -218,12 +218,12 @@ def stakeholders(pass_: _Cached, rows: list[dict]) -> None:
         )
 
 
-# --- tab 2: people not in the CRM ----------------------------------------- #
+# --- tab 1: people not in the CRM ----------------------------------------- #
 
 
 def not_in_crm(pass_: _Cached, reconciled: list[dict]) -> None:
-    """A name and title for people the CRM does not hold — the gap tab 2 exists
-    to report, with the part a person needs to act on it."""
+    """A name, title and LinkedIn URL for people the CRM does not hold — what a
+    person needs to add them, or to connect with them."""
     for r in reconciled:
         if not missing_from_crm(r):
             continue
@@ -231,15 +231,16 @@ def not_in_crm(pass_: _Cached, reconciled: list[dict]) -> None:
             # A role inbox is not a person. Looking it up spends a credit on an
             # answer that cannot be right.
             r["other_name"], r["other_title"] = "not looked up — shared inbox", ""
+            r["other_linkedin"] = ""
             continue
         p = pass_.person(r.get("email"))
         if p is None:
-            r["other_name"], r["other_title"] = not_found(pass_.provider), ""
+            r["other_name"], r["other_title"], r["other_linkedin"] = not_found(pass_.provider), "", ""
         else:
-            r["other_name"], r["other_title"] = p.name, p.title
+            r["other_name"], r["other_title"], r["other_linkedin"] = p.name, p.title, p.linkedin
 
 
-# --- tab 5: the review queue ---------------------------------------------- #
+# --- tab 4: the review queue ---------------------------------------------- #
 
 QUEUE_ORDER = (
     "Profile fit disputed",

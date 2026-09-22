@@ -119,7 +119,8 @@ class _Provider:
                                        employer_domain="globex.example", updated="2026-06-01"),
             # Not in the CRM; the provider knows them.
             "ari@acme.example": Person(name="Ari Stone", title="Director of Ops",
-                                       employer_name="Acme", employer_domain="acme.example"),
+                                       employer_name="Acme", employer_domain="acme.example",
+                                       linkedin="https://www.linkedin.com/in/ari-stone"),
         }
         self.companies = {
             # Agrees with the CRM's verdict, though not its number.
@@ -229,8 +230,7 @@ def test_with_no_provider_nothing_changes(tmp_path):
     wb, html, _ = _run(tmp_path, None)
 
     assert wb.sheetnames == [
-        "1 - Met this week", "2 - Missing from CRM", "3 - Company coverage",
-        "4 - Stakeholder list",
+        "1 - Met this week", "2 - Company coverage", "3 - Stakeholder list",
     ]
     for ws in wb.worksheets:
         headers, _ = _table(ws)
@@ -238,7 +238,7 @@ def test_with_no_provider_nothing_changes(tmp_path):
                        for h in headers), ws.title
     # The CRM's "no" stands alone, so the misrecorded company is off the map —
     # the invisible error the pass exists to surface.
-    _, rows = _table(wb["4 - Stakeholder list"])
+    _, rows = _table(wb["3 - Stakeholder list"])
     assert not any("Globex" in str(r["Company"]) for r in rows)
     assert "Review queue" not in html
 
@@ -248,7 +248,7 @@ def test_with_no_provider_nothing_changes(tmp_path):
 
 def test_company_verdicts_are_compared_not_numbers(tmp_path):
     wb, _, _ = _run(tmp_path, _Provider())
-    headers, rows = _table(wb["3 - Company coverage"])
+    headers, rows = _table(wb["2 - Company coverage"])
     by = {r["Company"]: r for r in rows}
 
     assert headers[-3:] == ["Employees (Example)", "HQ (Example)", "Profile check"]
@@ -264,7 +264,7 @@ def test_company_verdicts_are_compared_not_numbers(tmp_path):
 
 def test_a_disputed_rejection_reaches_the_map_marked(tmp_path):
     wb, _, _ = _run(tmp_path, _Provider())
-    _, rows = _table(wb["4 - Stakeholder list"])
+    _, rows = _table(wb["3 - Stakeholder list"])
 
     globex = [r for r in rows if str(r["Company"]).startswith("Globex")]
     assert globex and all(r["Company"] == "Globex (profile disputed)" for r in globex)
@@ -274,7 +274,7 @@ def test_a_disputed_rejection_reaches_the_map_marked(tmp_path):
 
 def test_still_at_company_and_differences(tmp_path):
     wb, _, _ = _run(tmp_path, _Provider())
-    headers, rows = _table(wb["4 - Stakeholder list"])
+    headers, rows = _table(wb["3 - Stakeholder list"])
     by = {r["Name"]: r for r in rows}
 
     assert headers[-3:] == ["Still at company?", "Title (Example)", "LinkedIn (Example)"]
@@ -296,15 +296,27 @@ def test_still_at_company_and_differences(tmp_path):
     assert by["Lee Park"]["Title (Example)"] in (None, "")
 
 
-def test_people_not_in_the_crm_get_a_name_and_title(tmp_path):
-    wb, _, _ = _run(tmp_path, _Provider())
-    _, rows = _table(wb["2 - Missing from CRM"])
+def test_people_not_in_the_crm_get_a_name_title_and_linkedin(tmp_path):
+    """On Met this week, for the people the CRM does not hold — including the
+    LinkedIn URL, which is what someone needs to connect with them."""
+    wb, html, _ = _run(tmp_path, _Provider())
+    headers, rows = _table(wb["1 - Met this week"])
     by = {r["Email"]: r for r in rows}
 
+    # The provider's name is in the header; the caption says what that means.
+    assert "The Example columns are enrichment from Example, not your CRM" in html
+
+    assert ["Name (Example)", "Title (Example)", "LinkedIn (Example)"] == [
+        h for h in headers if "(Example)" in h
+    ]
     assert by["ari@acme.example"]["Name (Example)"] == "Ari Stone"
     assert by["ari@acme.example"]["Title (Example)"] == "Director of Ops"
+    assert by["ari@acme.example"]["LinkedIn (Example)"] == "https://www.linkedin.com/in/ari-stone"
     assert by["pat@initech.example"]["Name (Example)"] == "not found in Example"
     assert by["support@acme.example"]["Name (Example)"] == "not looked up — shared inbox"
+    # People the CRM does hold are not given provider columns here: the
+    # stakeholder list is where the provider is set beside a CRM record.
+    assert by["dana@acme.example"]["Name (Example)"] in (None, "")
 
 
 def test_each_person_and_company_is_looked_up_once_and_inboxes_never(tmp_path):
@@ -323,7 +335,7 @@ def test_each_person_and_company_is_looked_up_once_and_inboxes_never(tmp_path):
 
 def test_the_review_queue_holds_what_a_person_should_settle(tmp_path):
     wb, html, _ = _run(tmp_path, _Provider())
-    headers, rows = _table(wb["5 - Review queue"])
+    headers, rows = _table(wb["4 - Review queue"])
 
     assert headers == ["What", "Company", "Person", "CRM says", "Example says", "Check"]
     kinds = [r["What"] for r in rows]
@@ -432,13 +444,13 @@ def test_the_weekly_run_checks_the_provider_first_and_adds_tab_5(
     assert any("Enrichment: Example" in line for line in logged)
 
     wb = load_workbook(paths["xlsx"])
-    assert "5 - Review queue" in wb.sheetnames
-    _, rows = _table(wb["3 - Company coverage"])
+    assert "4 - Review queue" in wb.sheetnames
+    _, rows = _table(wb["2 - Company coverage"])
     acme = next(r for r in rows if r["Company"] == "acme.com")
     assert acme["Profile check"] == "CRM not assessed — Example says yes"
     # Not assessed is not disputed: there is no CRM verdict to disagree with.
     assert "(profile disputed)" not in json.dumps(
-        [c.value for row in wb["4 - Stakeholder list"].iter_rows() for c in row], default=str
+        [c.value for row in wb["3 - Stakeholder list"].iter_rows() for c in row], default=str
     )
 
     dump = json.loads(open(paths["json"]).read())
@@ -463,10 +475,10 @@ def test_a_provider_without_a_linkedin_lookup_is_not_asked(tmp_path):
             return self._inner.company_by_domain(domain)
 
     wb, _, _ = _run(tmp_path, _EmailOnly())
-    _, rows = _table(wb["4 - Stakeholder list"])
+    _, rows = _table(wb["3 - Stakeholder list"])
     by = {r["Name"]: r for r in rows}
     assert by["Ray Oh"]["Still at company?"] == "not found in Example"
-    _, queue = _table(wb["5 - Review queue"])
+    _, queue = _table(wb["4 - Review queue"])
     assert not any(r["What"] == "CRM LinkedIn may be someone else" for r in queue)
 
 
@@ -484,3 +496,21 @@ def test_a_provider_without_a_linkedin_lookup_is_not_asked(tmp_path):
 )
 def test_names_agree_on_first_and_last(a, b, agree):
     assert enrichment.names_agree(a, b) is agree
+
+
+def test_the_stakeholder_list_says_how_it_is_built(tmp_path):
+    """Which companies, which people, how many and in what order — in the
+    reader's own values. A list of names with no stated rule reads as a
+    recommendation from nowhere."""
+    wb, html, _ = _run(tmp_path, _Provider())
+    captions = [
+        r[0] for r in wb["3 - Stakeholder list"].iter_rows(min_row=2, values_only=True)
+        if r[0] and not any(r[1:])
+    ]
+    rule = captions[0]
+    assert "50–5,000 employees, HQ in North America" in rule
+    assert "plus any whose profile fit is disputed" in rule   # Globex is
+    assert "up to 3 people from your CRM at VP or C-suite level" in rule
+    assert "most senior first, then most recently contacted" in rule
+    assert "People not in your CRM cannot appear here" in rule
+    assert rule in html

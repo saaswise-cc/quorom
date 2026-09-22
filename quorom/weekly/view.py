@@ -48,16 +48,13 @@ a{color:inherit;text-decoration:none;border-bottom:1px dotted #999}
 # words, so the page cannot drift from the workbook the way a hardcoded second
 # copy did.
 SECTIONS = [
-    ("3 - Company coverage", "Company coverage"),
-    ("4 - Stakeholder list", "Stakeholder list"),
+    ("2 - Company coverage", "Company coverage"),
+    ("3 - Stakeholder list", "Stakeholder list"),
     # Present only when an enrichment provider is configured; skipped otherwise
     # by the `in wb.sheetnames` test in render().
-    ("5 - Review queue", "Review queue"),
-    # "Not in CRM", not "Not in HubSpot or Salesforce": the heading must not
-    # name a system this run never called, and the sheet it renames is already
-    # correctly titled. A vendor name in customer-facing output is the same
-    # defect as a vendor field name in a query.
-    ("2 - Missing from CRM", "Not in CRM"),
+    ("4 - Review queue", "Review queue"),
+    # Everyone met, with the people not in the CRM first. It absorbed the old
+    # "Not in CRM" section, which was a filtered copy of it.
     ("1 - Met this week", "Met this week"),
 ]
 

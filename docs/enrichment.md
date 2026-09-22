@@ -1,7 +1,7 @@
 # Enrichment — a second opinion beside your CRM
 
 Optional. With no provider configured, a run and its output are exactly what
-`setup.md` describes: four tabs, nothing called, nothing spent. This file
+`setup.md` describes: three tabs, nothing called, nothing spent. This file
 covers what changes when one is configured.
 
 **The one provider implemented is LeadIQ**, through its GraphQL API. Nothing
@@ -25,7 +25,7 @@ disagreements are visible and a person can settle them.
 - **LinkedIn** is what a person checks by hand, and the one that settles it.
 
 So a provider value **never replaces** a CRM value. Quorom still writes nothing
-to your CRM. The output is a list of disagreements — tab 5, the review queue —
+to your CRM. The output is a list of disagreements — tab 4, the review queue —
 for someone to work through and apply in the CRM themselves. That someone does
 not need CRM access to do the checking, which is deliberate.
 
@@ -64,9 +64,9 @@ credits available:
 
 | Where | Looked up by | Compared |
 |---|---|---|
-| Tab 3 — Company coverage | domain | employee count and HQ country, through your ICP test |
-| Tab 4 — Stakeholder list | email; then the CRM's LinkedIn URL, if the email finds nothing | current employer, title, LinkedIn URL |
-| Tab 2 — Missing from CRM | email | name and title |
+| Tab 2 — Company coverage | domain | employee count and HQ country, through your ICP test |
+| Tab 3 — Stakeholder list | email; then the CRM's LinkedIn URL, if the email finds nothing | current employer, title, LinkedIn URL |
+| Tab 1 — Met this week, people not in the CRM | email | name, title and LinkedIn URL |
 
 Each person and each company is looked up once per run, whichever tab asks
 first. Shared inboxes (`support@`, `info@` …) are never looked up — a role
@@ -122,11 +122,14 @@ LinkedIn.
 
 ## What changes in the output
 
-**Tab 2 — Missing from CRM** gains `Name (LeadIQ)` and `Title (LeadIQ)`: who
-the provider says each missing person is. `not found in LeadIQ` where it has no
-record; `not looked up — shared inbox` for a role address.
+**Tab 1 — Met this week** gains `Name (LeadIQ)`, `Title (LeadIQ)` and
+`LinkedIn (LeadIQ)`, filled for the people not in your CRM: who the provider
+says each of them is, and the profile to connect with. `not found in LeadIQ`
+where it has no record; `not looked up — shared inbox` for a role address.
+People already in your CRM are not looked up here — the stakeholder list is
+where the provider is set beside a CRM record.
 
-**Tab 3 — Company coverage** gains `Employees (LeadIQ)`, `HQ (LeadIQ)` and
+**Tab 2 — Company coverage** gains `Employees (LeadIQ)`, `HQ (LeadIQ)` and
 `Profile check`. The comparison is the **verdict**, not the number: your ICP
 test runs on each source's own values, and only a different answer matters.
 250 against 275 employees is inside a 50–500 band either way; 480 against 520
@@ -142,11 +145,11 @@ flips it.
 **A disputed company goes onto the stakeholder list, marked.** A wrong "yes" is
 visible — the company appears on the map and someone looks at it. A wrong "no"
 is not: the company never reaches the map and nobody knows to look. So a
-company your CRM rejects and the provider would accept is put on tab 4 as
+company your CRM rejects and the provider would accept is put on tab 3 as
 `<company> (profile disputed)` for a person to settle. An existing customer
 (`CUSTOMER_ACCOUNT_TYPES`) stays off either way.
 
-**Tab 4 — Stakeholder list** gains three columns:
+**Tab 3 — Stakeholder list** gains three columns:
 
 | Column | Values |
 |---|---|
@@ -163,7 +166,7 @@ A detected move flags the row; it never removes it. The CRM record is still
 what you have, and a name vanishing without explanation is worse than a name
 marked stale.
 
-**Tab 5 — Review queue** exists only with a provider configured. One row per
+**Tab 4 — Review queue** exists only with a provider configured. One row per
 thing a person should settle, most consequential first, each saying what to
 check and where:
 

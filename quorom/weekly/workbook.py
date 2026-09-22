@@ -1,5 +1,5 @@
-"""Step 6 — emit. Four tabs, and a fifth when an enrichment provider is
-configured.
+"""Step 6 — emit. Three tabs, and a fourth — the review queue — when an
+enrichment provider is configured.
 
 Nothing is written back to any system. The workbook and the JSON dump are the
 only outputs, and the dump redacts MobilePhone to a boolean: sensitive contact
@@ -17,8 +17,15 @@ from openpyxl.styles import Font, PatternFill
 
 from ..config import Config
 from ..crm.fieldmap import NOT_AVAILABLE, NOT_CHECKED
-from .people import missing_from_crm
+from .coverage import seniority_prose
+from .people import in_any_crm, missing_from_crm
 from .stakeholders import NO_SENIOR_CONTACT
+
+# A CRM column for someone with no CRM record. Not "no" — that asserts a fact
+# about a record that does not exist — and not blank, which on LinkedIn? means
+# "the CRM has the field and nothing in it". The in-CRM column beside it says
+# why, and the caption says what the dash means.
+NO_RECORD = "—"
 
 HEADER_FILL = "2F5B7C"
 
@@ -61,15 +68,17 @@ def _mobile_cell(value) -> str:
 
 
 def _checked_against(cfg: Config) -> str:
-    """Tab 2's caption line naming the one CRM it was checked against, or "".
+    """Met this week's caption line naming the one CRM it was checked against,
+    or "".
 
-    This used to be a Source column holding the same value on every row, under
-    the header that means "where this person came from" on tab 1 — so a tab of
-    people not in Salesforce read "salesforce" beside each of them. A run-wide
-    fact is stated once, in the caption, the way tab 3 states its ICP test.
+    This used to be a Source column on the old Missing-from-CRM tab, holding the
+    same value on every row under the header that means "where this person came
+    from" — so a tab of people not in Salesforce read "salesforce" beside each
+    of them. A run-wide fact is stated once, in the caption, the way the
+    coverage tab states its ICP test.
 
     With both CRMs configured the "In …?" columns already say it per row, and
-    with none the tab has no rows to explain. The names are the vendors' own,
+    with none there is nothing to explain. The names are the vendors' own,
     which is fine in a line that reports provenance — what is not fine is
     naming one that was not consulted.
     """
@@ -81,6 +90,18 @@ def _checked_against(cfg: Config) -> str:
     return f"Checked against {names[0]}." if len(names) == 1 else ""
 
 
+def _band(profile: dict) -> str:
+    lo = profile.get("employee_count_min")
+    hi = profile.get("employee_count_max")
+    if lo and hi:
+        return f"{lo:,}–{hi:,} employees"
+    if lo:
+        return f"{lo:,}+ employees"
+    if hi:
+        return f"up to {hi:,} employees"
+    return "any size"
+
+
 def _profile_sentence(profile: dict, geo_label: str) -> str:
     """The ICP test in the reader's words, using their own numbers.
 
@@ -90,17 +111,7 @@ def _profile_sentence(profile: dict, geo_label: str) -> str:
     reader looking at a column of yes and no needs to know what the test was,
     and nothing else on the page tells them.
     """
-    lo = profile.get("employee_count_min")
-    hi = profile.get("employee_count_max")
-    if lo and hi:
-        band = f"{lo:,}–{hi:,} employees"
-    elif lo:
-        band = f"{lo:,}+ employees"
-    elif hi:
-        band = f"up to {hi:,} employees"
-    else:
-        band = "any size"
-    return f"Meets profile? = {band}, HQ in {geo_label}."
+    return f"Meets profile? = {_band(profile)}, HQ in {geo_label}."
 
 
 def build_workbook(
@@ -117,7 +128,7 @@ def build_workbook(
 ) -> None:
     """`enrichment` is the configured provider's display name, or None.
 
-    None is the default and changes nothing: no provider column, no tab 5. The
+    None is the default and changes nothing: no provider column, no tab 4. The
     same rule as a CRM that is not configured — an absent source contributes no
     column, rather than a column saying it was not asked.
     """
@@ -125,106 +136,94 @@ def build_workbook(
     wb = Workbook()
     wb.remove(wb.active)
 
-    # Tab 1 — Met this week
+    # Tab 1 — Met this week: everyone met, one row per person, and whether each
+    # is in the CRM.
     #
-    # Three of these columns report what a CRM holds — the title, the LinkedIn
-    # presence and the mobile presence. With no CRM configured none of them was
-    # asked, so they are dropped rather than filled, exactly as tabs 2 and 3
-    # drop the columns of a provider that was never queried. The tab itself
-    # survives: who attended is answerable from the meeting source alone, which
-    # is what makes this different from tab 2.
+    # This used to be two tabs — everyone met, and a second tab of those not in
+    # the CRM — so a reader compared two lists to find the people to add, and
+    # the second was a filtered copy of the first. One list, with the people
+    # not in the CRM sorted to the top, says the same thing once.
     #
-    # Dropped rather than rendered "not checked" because a whole column of it on
-    # every row is noise, and the absent header says the same thing once. The
-    # distinction still exists in the data — reconcile() emits NOT_CHECKED — so
-    # nothing downstream has to re-derive it.
-    crm_on = cfg.salesforce.configured or cfg.hubspot.configured
-    ws1 = _sheet(
-        wb,
-        "1 - Met this week",
-        # "Title (CRM)", not "Title (SF)". The value already comes from either
-        # CRM — Salesforce wins, HubSpot is the fallback — so "(SF)" was
-        # imprecise even with Salesforce configured, and names a system that was
-        # never called without it. Which system holds a differing title is
-        # already stated in Flag, and the next column is "Mobile in CRM?".
-        ["Name", "Email"]
-        + (["Title (CRM)", "LinkedIn?", "Mobile in CRM?"] if crm_on else [])
-        + ["Flag", "Source"],
-    )
-    for r in reconciled:
-        row = [r.get("attendee_name"), r.get("email", "")]
-        if crm_on:
-            row += [
-                r.get("title", ""),
-                _linkedin_cell(r.get("linkedin_in_crm")),
-                _mobile_cell(r.get("mobile_in_crm")),
-            ]
-        ws1.append(row + [r.get("flag", ""), "gong"])
-
-    # Tab 2 — Missing from CRM
+    # The in-CRM column follows the cross-CRM rule: with both CRMs configured it
+    # is the pair "In HubSpot?" / "In Salesforce?" — "in HubSpot but not
+    # Salesforce" is the actionable answer, and a merged column would lose it.
+    # With one, a single "In CRM?", and the caption names which. With none,
+    # nothing: no CRM was asked. The CRM-derived columns are dropped with no CRM
+    # for the same reason, rather than filled with "not checked".
     #
-    # A CRM that was not configured was not queried, so it gets no column at
-    # all rather than a column of "not checked".
-    #
-    # **And with only one configured, neither does it.** Every row on this tab
-    # is here *because* it is missing from a CRM, so with a single CRM the
-    # column is the word NO repeated down the page — the sheet's own title
-    # already said it. The columns earn their place only when both are on,
-    # which is the case they exist for: "in HubSpot but not Salesforce" is
-    # actionable, and a single merged "In CRM?" would throw that away.
-    #
-    # No Source column, for the same reason: it was the same value on every row.
-    # Which CRM the tab was checked against is a caption line instead.
+    # A person with no CRM record gets a dash in the CRM columns, never "no": a
+    # "no" there asserts a fact about a record that does not exist.
     hs_on = cfg.hubspot.configured
     sf_on = cfg.salesforce.configured
     both_crms = hs_on and sf_on
-    ws2 = _sheet(
+    crm_on = sf_on or hs_on
+    ws1 = _sheet(
         wb,
-        "2 - Missing from CRM",
+        "1 - Met this week",
         ["Name", "Email", "Company (domain)"]
-        + (["In HubSpot?", "In Salesforce?"] if both_crms else [])
-        + ([f"Name ({other})", f"Title ({other})"] if other else [])
-        + ["Flag"],
+        + (["In HubSpot?", "In Salesforce?"] if both_crms else ["In CRM?"] if crm_on else [])
+        # "Title (CRM)", not "Title (SF)": the value comes from either CRM —
+        # Salesforce wins, HubSpot is the fallback.
+        + (["Title (CRM)", "LinkedIn?", "Mobile in CRM?"] if crm_on else [])
+        + ([f"Name ({other})", f"Title ({other})", f"LinkedIn ({other})"] if other else [])
+        + ["Flag", "Source"],
     )
-    for r in reconciled:
-        in_sf = r.get("in_salesforce")
-        in_hs = r.get("in_hubspot")
-        # None is "not checked", and only ever arises for a CRM that is
-        # unconfigured — whose column is not rendered. So a rendered cell is
-        # always a real yes/no, and "not checked" never reaches this tab.
-        if missing_from_crm(r):
-            flag = r.get("flag", "")
-            # "needs name/title" is redundant in a gap report — the row IS the gap.
-            flag = flag if "shared inbox" in flag else ""
-            row = [r.get("attendee_name"), r.get("email", ""), r.get("domain")]
-            if both_crms:
-                row += ["yes" if in_hs else "NO", "yes" if in_sf else "NO"]
-            if other:
-                row += [r.get("other_name", ""), r.get("other_title", "")]
-            ws2.append(row + [flag])
+    # Not in the CRM first — the most directly actionable rows. Stable, so the
+    # order within each group is unchanged.
+    for r in sorted(reconciled, key=lambda r: not missing_from_crm(r)):
+        row = [r.get("attendee_name"), r.get("email", ""), r.get("domain")]
+        if both_crms:
+            row += ["yes" if r.get("in_hubspot") else "NO",
+                    "yes" if r.get("in_salesforce") else "NO"]
+        elif crm_on:
+            row.append("yes" if in_any_crm(r) else "NO")
+        if crm_on:
+            if in_any_crm(r):
+                row += [
+                    r.get("title", ""),
+                    _linkedin_cell(r.get("linkedin_in_crm")),
+                    _mobile_cell(r.get("mobile_in_crm")),
+                ]
+            else:
+                row += [NO_RECORD, NO_RECORD, NO_RECORD]
+        if other:
+            # Filled only for people not in the CRM: for everyone else the CRM
+            # already holds a record, and the stakeholder list is where the
+            # provider is set beside it.
+            row += [r.get("other_name", ""), r.get("other_title", ""),
+                    r.get("other_linkedin", "")]
+        ws1.append(row + [r.get("flag", ""), "gong"])
+    notes = []
     checked = _checked_against(cfg)
-    if checked or suppressed:
-        ws2.append([])
     if checked:
-        ws2.append([checked])
-    if suppressed:
-        ws2.append(
-            [
-                "Suppressed as non-contacts (no email/domain — likely meeting bots): "
-                + ", ".join(suppressed)
-            ]
+        notes.append(checked)
+    if crm_on:
+        notes.append(
+            "People not in the CRM are listed first. — in a CRM column means there "
+            "is no CRM record to read."
+            + (f" The {other} columns are enrichment from {other}, not your CRM, and are"
+               " filled for these people only." if other else "")
         )
+    if suppressed:
+        notes.append(
+            "Suppressed as non-contacts (no email/domain — likely meeting bots): "
+            + ", ".join(suppressed)
+        )
+    if notes:
+        ws1.append([])
+        for n in notes:
+            ws1.append([n])
 
-    # Tab 3 — Company coverage (triage)
+    # Tab 2 — Company coverage (triage)
     #
-    # Same rule as tab 2, applied to counts: a provider that was not queried
+    # Same rule as the CRM columns on tab 1, applied to counts: a provider that was not queried
     # contributes no column. A count column has to stay numeric to be sortable
     # and summable — writing "not checked" into it would turn the whole column
     # to text and quietly break sorting on the tab whose job is triage — so the
     # absence is expressed by dropping the column rather than by a value in it.
     ws3 = _sheet(
         wb,
-        "3 - Company coverage",
+        "2 - Company coverage",
         ["Company", "Company name", "Employees", "HQ", "Account type",
          "Meets profile?", "Met this wk"]
         + (["SF contacts", "SF focus-senior"] if sf_on else [])
@@ -265,10 +264,10 @@ def build_workbook(
             ]
         )
 
-    # Tab 4 — Stakeholder list (the map)
+    # Tab 3 — Stakeholder list (the map)
     ws4 = _sheet(
         wb,
-        "4 - Stakeholder list",
+        "3 - Stakeholder list",
         ["Company", "Name", "Title", "Recent contact?", "LinkedIn", "Mobile in CRM?"]
         + (["Still at company?", f"Title ({other})", f"LinkedIn ({other})"] if other else []),
     )
@@ -282,13 +281,24 @@ def build_workbook(
             row += [r.get("still_at", ""), r.get("other_title", ""), r.get("other_linkedin", "")]
         ws4.append(row)
     ws4.append([])
-    # Two lines, and only what a reader needs to read a value in the table.
-    # Design rationale, open questions and ticket references belong in the repo
-    # and in Linear — not in a file that goes to a customer.
+    # How the list is built, in the reader's own values — which companies, which
+    # people, how many, in what order. A list of names with no stated rule reads
+    # as a recommendation from nowhere. Only what a reader needs: design
+    # rationale and ticket references belong in the repo and in Linear.
+    also = []
+    if any(c.get("disputed") for c in coverage):
+        also.append("any whose profile fit is disputed")
+    if any(not c.get("assessed", True) for c in coverage):
+        also.append("any that could not be assessed")
     ws4.append(
         [
-            "People already in your CRM at these companies, most senior first. "
-            "Others may exist who aren't in the CRM."
+            f"Companies met this week that meet your profile ({_band(profile)}, HQ in "
+            f"{geo_label})"
+            + (", plus " + " and ".join(also) if also else "")
+            + f". For each, up to {cfg.shortlist_size} people from your CRM at "
+            f"{seniority_prose(profile)} level, most senior first, then most recently "
+            "contacted. People not in your CRM cannot appear here — they are on Met "
+            "this week."
         ]
     )
     ws4.append(
@@ -306,12 +316,12 @@ def build_workbook(
             ]
         )
 
-    # Tab 5 — Review queue. Only with a provider: it holds the disagreements
+    # Tab 4 — Review queue. Only with a provider: it holds the disagreements
     # between the CRM and that provider, and there are none to hold without one.
     if other:
         ws5 = _sheet(
             wb,
-            "5 - Review queue",
+            "4 - Review queue",
             ["What", "Company", "Person", "CRM says", f"{other} says", "Check"],
         )
         for q in queue or []:

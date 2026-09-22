@@ -149,24 +149,23 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
     wb = load_workbook(paths["xlsx"])
     assert wb.sheetnames == [
         "1 - Met this week",
-        "2 - Missing from CRM",
-        "3 - Company coverage",
-        "4 - Stakeholder list",
+        "2 - Company coverage",
+        "3 - Stakeholder list",
     ]
 
     # 11 distinct external people met in the pinned week: Dana, support@, and
     # nine trainees. The historical call and the internal attendees are out.
-    met = list(wb["1 - Met this week"].iter_rows(min_row=2, values_only=True))
+    # Caption rows (column A alone) are not people.
+    met = [
+        r for r in wb["1 - Met this week"].iter_rows(min_row=2, values_only=True)
+        if any(r[1:])
+    ]
     assert len(met) == 11
 
-    # No CRM was queried, so nothing can be reported missing from one. The
-    # columns that would have said so are not rendered at all — see
-    # test_tabs_2_and_3_omit_a_crm_that_was_never_queried.
-    missing = [
-        r for r in wb["2 - Missing from CRM"].iter_rows(min_row=2, values_only=True)
-        if r[0]
-    ]
-    assert missing == []
+    # No CRM was queried, so nobody can be reported as missing from one. The
+    # in-CRM column that would have said so is not rendered at all — see
+    # test_tabs_omit_a_crm_that_was_never_queried.
+    assert "In CRM?" not in _headers(wb["1 - Met this week"])
 
     dump = json.loads(open(paths["json"]).read())
     assert dump["account"] == ACCOUNT
@@ -184,8 +183,8 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
         # meeting source labels `amer-bdr@` as "AMER BDR", and a real person's
         # name can sit on a shared `jobs@` address — treating the name as proof
         # of a person meant neither was ever flagged, and the Flag column on
-        # tab 2 was empty for every row as a result.
-        ("Fabio Andres Betancur", "jobs@example.com", "shared inbox — verify"),
+        # tab 1 was empty for every row as a result.
+        ("Casey Morrow", "jobs@example.com", "shared inbox — verify"),
         (None, "support@example.com", "shared inbox — verify"),
         # A person keeps their name, and a nameless one still needs enriching.
         ("Dana Reyes", "dana@example.com", ""),
@@ -211,7 +210,7 @@ def test_the_icp_test_states_itself_in_the_readers_numbers(
     _seed_profile(database, account_id)
 
     paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
-    ws = load_workbook(paths["xlsx"])["3 - Company coverage"]
+    ws = load_workbook(paths["xlsx"])["2 - Company coverage"]
     caption = " ".join(
         str(r[0]) for r in ws.iter_rows(min_row=2, values_only=True)
         if r[0] and str(r[0]).startswith("Meets profile?")
@@ -354,9 +353,10 @@ def test_tab_1_states_what_was_never_asked(database, gong_calls, tmp_path):
     row, `needs title` on every named attendee, and a blank LinkedIn cell
     indistinguishable from 'we looked and found none'.
 
-    The three CRM-derived columns are dropped, the same answer tabs 2 and 3
-    already give for a provider that was never queried — the tab survives
-    because who attended comes from the meeting source, not the CRM."""
+    The three CRM-derived columns are dropped, the same answer the coverage tab
+    gives for a provider that was never queried — the tab survives because who
+    attended comes from the meeting source, not the CRM. So is the in-CRM
+    column: with no CRM there is nothing to be in."""
     from quorom.crm.fieldmap import NOT_CHECKED
 
     account_id = _seed_account(database)
@@ -367,10 +367,10 @@ def test_tab_1_states_what_was_never_asked(database, gong_calls, tmp_path):
     ws = load_workbook(paths["xlsx"])["1 - Met this week"]
 
     # Enumerated, not counted: a column added or removed fails here visibly.
-    assert _headers(ws) == ["Name", "Email", "Flag", "Source"]
+    assert _headers(ws) == ["Name", "Email", "Company (domain)", "Flag", "Source"]
 
     flag = _headers(ws).index("Flag")
-    rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] or r[1]]
+    rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if any(r[1:])]
     assert rows, "no attendees rendered — the rest of this test proves nothing"
 
     # "needs title" is a finding about a CRM. None was asked, so it cannot be
@@ -554,7 +554,7 @@ def _headers(ws) -> list:
     return [h for h in next(ws.iter_rows(max_row=1, values_only=True)) if h]
 
 
-def test_tabs_2_and_3_omit_a_crm_that_was_never_queried(database, gong_calls, tmp_path):
+def test_tabs_omit_a_crm_that_was_never_queried(database, gong_calls, tmp_path):
     """Four output surfaces, in the state the suite actually runs in.
 
     Nothing covered this before: the suite has always run with both CRMs off
@@ -570,16 +570,15 @@ def test_tabs_2_and_3_omit_a_crm_that_was_never_queried(database, gong_calls, tm
     paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
     wb = load_workbook(paths["xlsx"])
 
-    # Tab 2 — neither "In HubSpot?" nor "In Salesforce?" is offered, so
-    # "not checked" never has to appear on this tab at all.
-    assert _headers(wb["2 - Missing from CRM"]) == [
-        "Name", "Email", "Company (domain)", "Flag",
-    ]
+    # Tab 1 — no in-CRM column of any kind is offered, so "not checked" never
+    # has to appear on this tab at all.
+    headers = _headers(wb["1 - Met this week"])
+    assert not {"In CRM?", "In HubSpot?", "In Salesforce?"} & set(headers)
 
-    # Tab 3 — the count columns for both unqueried providers are gone. A 0
+    # Tab 2 — the count columns for both unqueried providers are gone. A 0
     # here would be indistinguishable from a company with genuinely no
     # contacts on file.
-    assert _headers(wb["3 - Company coverage"]) == [
+    assert _headers(wb["2 - Company coverage"]) == [
         "Company", "Company name", "Employees", "HQ", "Account type",
         "Meets profile?", "Met this wk",
     ]
@@ -598,10 +597,10 @@ def test_tabs_2_and_3_omit_a_crm_that_was_never_queried(database, gong_calls, tm
         assert company["sf_total"] is None
         assert company["sf_senior"] is None
 
-    # The HTML view renamed the tab to a heading naming both vendors. It is
-    # the file a reader actually opens.
+    # The HTML view once had a heading naming both vendors. It is the file a
+    # reader actually opens, and it must name neither CRM when neither ran.
     html = open(paths["html"]).read()
-    assert "Not in CRM" in html
+    assert "Met this week" in html
     assert "Not in HubSpot or Salesforce" not in html
     assert "hubspot" not in html.lower()
 
@@ -610,28 +609,27 @@ def test_tabs_2_and_3_omit_a_crm_that_was_never_queried(database, gong_calls, tm
     "hs_on, sf_on, crm_columns, checked",
     [
         (True, True, ["In HubSpot?", "In Salesforce?"], None),
-        (True, False, [], "Checked against HubSpot."),
-        (False, True, [], "Checked against Salesforce."),
+        (True, False, ["In CRM?"], "Checked against HubSpot."),
+        (False, True, ["In CRM?"], "Checked against Salesforce."),
         (False, False, [], None),
     ],
 )
 def test_workbook_columns_follow_the_crms_configured(
     tmp_path, hs_on, sf_on, crm_columns, checked
 ):
-    """Both columns survive when both CRMs are on — "in HubSpot but not
-    Salesforce" is the actionable answer and merging them into one "In CRM?"
-    would lose it.
+    """Met this week says, per person, whether they are in the CRM.
 
-    **With only one CRM configured, neither column is rendered.** Every row on
-    this tab is here because it is missing from a CRM, so a single CRM's column
-    is the word NO repeated down the page, restating the sheet's own title. This
-    supersedes the earlier expectation that the configured one survived alone —
-    a real deployment running one CRM read it as a redundant column, and it was.
+    With both CRMs on, the pair "In HubSpot?" / "In Salesforce?" — "in HubSpot
+    but not Salesforce" is the actionable answer, and one merged column would
+    lose it. With one, a single "In CRM?", and the caption names which CRM. With
+    none, no column: nobody can be in a CRM that was never asked.
 
-    **No Source column either.** It held which CRMs were checked — the same
-    value on every row, under a header that means "where this person came from"
-    on tab 1. With one CRM that fact is stated once, in the caption; with both,
-    the two columns state it per row.
+    This tab absorbed the old Missing-from-CRM tab, which was a filtered copy of
+    it. Its Source column held which CRMs were checked — the same value on every
+    row — and that fact is still a caption line.
+
+    A person with no CRM record gets "—" in the CRM columns, never "no": a "no"
+    in Mobile in CRM? asserted a fact about a record that does not exist.
 
     A unit test rather than an end-to-end one: configuring a CRM leg there would
     make the run reach for the real API. The config is a stub, not Config(),
@@ -639,24 +637,35 @@ def test_workbook_columns_follow_the_crms_configured(
     """
     from types import SimpleNamespace
 
-    from quorom.weekly.workbook import build_workbook
+    from quorom.weekly.workbook import NO_RECORD, build_workbook
 
     cfg = SimpleNamespace(
         hubspot=SimpleNamespace(configured=hs_on),
         salesforce=SimpleNamespace(configured=sf_on),
         recent_days=90,
+        shortlist_size=3,
     )
+    crm_on = hs_on or sf_on
 
     reconciled = [
         {
-            "attendee_name": "Dana Reyes", "email": "dana@acme.com",
-            "domain": "acme.com", "flag": "", "title": "Director of RevOps",
+            # In the CRM — listed second.
+            "attendee_name": "Sam Fox", "email": "sam@acme.com",
+            "domain": "acme.com", "flag": "", "title": "VP Sales",
             "mobile_in_crm": False, "linkedin_in_crm": False,
-            # False is a real answer from a CRM that was called; None is what
-            # reconcile() writes for one that was not.
+            "in_hubspot": True if hs_on else None,
+            "in_salesforce": True if sf_on else None,
+        },
+        {
+            # Not in the CRM — listed first. False is a real answer from a CRM
+            # that was called; None is what reconcile() writes for one that
+            # was not.
+            "attendee_name": "Dana Reyes", "email": "dana@acme.com",
+            "domain": "acme.com", "flag": "", "title": "",
+            "mobile_in_crm": False, "linkedin_in_crm": False,
             "in_hubspot": False if hs_on else None,
             "in_salesforce": False if sf_on else None,
-        }
+        },
     ]
     coverage = [
         {
@@ -675,13 +684,16 @@ def test_workbook_columns_follow_the_crms_configured(
         geo_label="United States/Canada",
     )
     wb = load_workbook(out)
+    assert "2 - Missing from CRM" not in wb.sheetnames
 
-    ws2 = wb["2 - Missing from CRM"]
-    assert _headers(ws2) == (
-        ["Name", "Email", "Company (domain)"] + crm_columns + ["Flag"]
+    ws1 = wb["1 - Met this week"]
+    assert _headers(ws1) == (
+        ["Name", "Email", "Company (domain)"] + crm_columns
+        + (["Title (CRM)", "LinkedIn?", "Mobile in CRM?"] if crm_on else [])
+        + ["Flag", "Source"]
     )
 
-    ws3 = wb["3 - Company coverage"]
+    ws3 = wb["2 - Company coverage"]
     assert _headers(ws3) == (
         ["Company", "Company name", "Employees", "HQ", "Account type",
          "Meets profile?", "Met this wk"]
@@ -689,30 +701,37 @@ def test_workbook_columns_follow_the_crms_configured(
         + (["HubSpot contacts"] if hs_on else [])
     )
 
-    all_rows = list(ws2.iter_rows(min_row=2, values_only=True))
-    # Caption lines sit in column A with the rest of the row blank.
+    all_rows = list(ws1.iter_rows(min_row=2, values_only=True))
     captions = [r[0] for r in all_rows if r[0] and not any(r[1:])]
-    rows = [r for r in all_rows if r[0] and any(r[1:])]
-    assert captions == ([checked] if checked else [])
+    rows = [dict(zip(_headers(ws1), r)) for r in all_rows if any(r[1:])]
+    assert (checked in captions) if checked else not any(
+        str(c).startswith("Checked against") for c in captions
+    )
 
-    if not (hs_on or sf_on):
-        # Nothing can be missing from a CRM that was never consulted.
-        assert rows == []
+    if not crm_on:
+        # Nobody is missing from a CRM that was never asked: order unchanged.
+        assert [r["Name"] for r in rows] == ["Sam Fox", "Dana Reyes"]
         return
-
-    assert len(rows) == 1
-    # No vendor is named on the row itself: which CRM was checked is either
-    # the caption or the column headers.
-    assert "hubspot" not in " ".join(str(v) for v in rows[0]).lower()
-    assert "salesforce" not in " ".join(str(v) for v in rows[0]).lower()
-    # Every rendered CRM cell is a real answer, never "not checked".
-    assert list(rows[0][3:3 + len(crm_columns)]) == ["NO"] * len(crm_columns)
+    # Not in the CRM first.
+    assert [r["Name"] for r in rows] == ["Dana Reyes", "Sam Fox"]
+    dana, sam = rows
+    for col in crm_columns:
+        assert dana[col] == "NO" and sam[col] == "yes"
+    # No record: a dash, never "no".
+    assert (dana["Title (CRM)"], dana["LinkedIn?"], dana["Mobile in CRM?"]) == (NO_RECORD,) * 3
+    # A record with no mobile on it: a real "no".
+    assert sam["Mobile in CRM?"] == "no"
+    # No vendor is named on a row: which CRM was checked is the caption or the
+    # column headers.
+    for r in rows:
+        assert "hubspot" not in " ".join(str(v) for v in r.values()).lower()
+        assert "salesforce" not in " ".join(str(v) for v in r.values()).lower()
 
 
 def test_the_map_filter_keeps_a_company_it_could_not_assess():
     """The filter half. `is_target` is False for a company that failed the ICP
     test AND for one the test could not run on, so filtering on it alone drops
-    the second kind off tab 4 — a company disappearing from the map because
+    the second kind off tab 3 — a company disappearing from the map because
     data nobody fetched did not clear a bar."""
     from quorom.weekly.stakeholders import companies_for_map
 
@@ -736,8 +755,8 @@ def test_no_crm_does_not_silently_empty_the_stakeholder_map(
     reporting a verdict.
 
     Before this, empty firmographics made every company fail on "no size", and
-    the same verdict is the filter feeding tab 4, so the map came out empty.
-    Nothing errored and the workbook had its usual shape: an empty tab 4 reads
+    the same verdict is the filter feeding tab 3, so the map came out empty.
+    Nothing errored and the workbook had its usual shape: an empty tab 3 reads
     as "nobody worth considering this week", which is a finding a reader would
     act on, rather than "the test never ran".
     """
@@ -751,22 +770,22 @@ def test_no_crm_does_not_silently_empty_the_stakeholder_map(
     paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
     wb = load_workbook(paths["xlsx"])
 
-    # Tab 3 — the verdict column states that no verdict was reached. Not "no
+    # Tab 2 — the verdict column states that no verdict was reached. Not "no
     # size", which is a finding about the company.
-    ws3 = wb["3 - Company coverage"]
+    ws3 = wb["2 - Company coverage"]
     verdict = _headers(ws3).index("Meets profile?")
     companies = [r for r in ws3.iter_rows(min_row=2, values_only=True) if r[1] or r[6]]
-    assert companies, "the company met this week must still appear on tab 3"
+    assert companies, "the company met this week must still appear on tab 2"
     for row in companies:
         assert row[verdict] == NOT_ASSESSED
 
-    # Tab 4 — not empty. Every company that reached the map is on it, saying
+    # Tab 3 — not empty. Every company that reached the map is on it, saying
     # why there are no people rather than being absent.
     tab4 = [
-        r for r in wb["4 - Stakeholder list"].iter_rows(min_row=2, values_only=True)
+        r for r in wb["3 - Stakeholder list"].iter_rows(min_row=2, values_only=True)
         if r[1]
     ]
-    assert tab4, "tab 4 must not be empty when the ICP test could not run"
+    assert tab4, "tab 3 must not be empty when the ICP test could not run"
     assert {r[1] for r in tab4} == {ICP_NOT_ASSESSED}
     assert {r[0] for r in tab4} == {"acme.com"}
     # Not the "we looked and found nobody" row — nothing was looked at.
@@ -777,7 +796,7 @@ def test_no_crm_does_not_silently_empty_the_stakeholder_map(
     # An earlier fix renamed this column "Title (SF)" → "Title (CRM)" and
     # asserted the renamed column was present. This goes further: with no CRM
     # configured the title was empty on every row anyway, so the column is
-    # dropped rather than renamed — the same answer tabs 2 and 3 give. The
+    # dropped rather than renamed — the same answer tab 2 gives. The
     # "(SF)" assertion is what mattered and it still holds — a header naming an
     # uncalled system is the defect, and no header can name one now.
     assert "Title (SF)" not in _headers(wb["1 - Met this week"])

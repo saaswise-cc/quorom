@@ -132,7 +132,7 @@ def _people():
          "domain": "acme.example", "meeting_title": "Intro"},
         {"attendee_name": "Lee Park", "email": "lee@acme.example",
          "domain": "acme.example", "meeting_title": "Intro"},
-        # In neither CRM, so it lands on tab 2 whichever one is configured.
+        # In neither CRM, so it is listed first on tab 1 whichever one is configured.
         {"attendee_name": "Ari Stone", "email": "ari@acme.example",
          "domain": "acme.example", "meeting_title": "Intro"},
     ]
@@ -184,9 +184,11 @@ def test_one_crm_renders_nothing_that_compares_two(tmp_path, sf_on, hs_on, crm):
 
     # Not vacuous: the configured CRM did answer with titles, which is what the
     # "title only in" flag used to fire on — on every such row.
+    ws = wb["1 - Met this week"]
+    col = _headers(ws).index("Title (CRM)")   # by name: positions move
     titles = [
-        r[2] for r in wb["1 - Met this week"].iter_rows(min_row=2, values_only=True)
-        if r[2]
+        r[col] for r in ws.iter_rows(min_row=2, values_only=True)
+        if r[col] and r[col] != "—"
     ]
     assert titles, "no CRM title rendered — the flag assertions below prove nothing"
 
@@ -199,12 +201,13 @@ def test_one_crm_renders_nothing_that_compares_two(tmp_path, sf_on, hs_on, crm):
     for text in CROSS_CRM_HEADERS + CROSS_CRM_FLAGS:
         assert text not in html
 
-    # Tab 2 has no Source column. The CRM it was checked against is stated once,
-    # in the caption — on the sheet and on the page.
-    ws2 = wb["2 - Missing from CRM"]
-    assert _headers(ws2) == ["Name", "Email", "Company (domain)", "Flag"]
-    missing = [r for r in ws2.iter_rows(min_row=2, values_only=True) if r[0] and any(r[1:])]
-    assert missing, "nobody on tab 2 — the caption has no rows to explain"
+    # One "In CRM?" column on Met this week — not a per-CRM pair — and the CRM
+    # it was checked against is stated once, in the caption, on the sheet and
+    # on the page.
+    ws1 = wb["1 - Met this week"]
+    assert "In CRM?" in _headers(ws1)
+    missing = [r for r in ws1.iter_rows(min_row=2, values_only=True) if "NO" in r]
+    assert missing, "nobody missing from the CRM — the column proves nothing"
     assert f"Checked against {crm}." in [c for _, c in _cells(wb)]
     assert f"Checked against {crm}." in html
 
@@ -221,10 +224,9 @@ def test_both_crms_still_compare(tmp_path):
     assert flags["Sam Fox"] == "title only in HubSpot"
     assert flags["Lee Park"] == "title differs (SF: VP Marketing / HS: CMO)"
 
-    ws2 = wb["2 - Missing from CRM"]
-    assert _headers(ws2) == [
-        "Name", "Email", "Company (domain)", "In HubSpot?", "In Salesforce?", "Flag",
-    ]
+    headers = _headers(ws1)
+    assert "In HubSpot?" in headers and "In Salesforce?" in headers
+    assert "In CRM?" not in headers
     # The columns say it per row, so no caption repeats it.
     assert not any(v.startswith("Checked against") for _, v in _cells(wb))
     assert "Checked against" not in html

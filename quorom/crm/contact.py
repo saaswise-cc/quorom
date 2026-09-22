@@ -12,14 +12,14 @@ This is the other half. An adapter hands back `Contact`, and nothing under
 
 Six fields, each one read by a column:
 
-  name           tab 4 'Name'
-  title          tab 1 'Title (CRM)', tab 4 'Title', and the seniority ordering
+  name           tab 3 'Name'
+  title          tab 1 'Title (CRM)', tab 3 'Title', and the seniority ordering
   email          the key meeting history is joined on
-  mobile         tab 1 and tab 4 'Mobile in CRM?' — presence only. The number
+  mobile         tab 1 and tab 3 'Mobile in CRM?' — presence only. The number
                  itself never leaves the CRM: sensitive contact fields pass
                  through to it and never into a Quorom store.
-  linkedin       tab 1 'LinkedIn?' and tab 4 'LinkedIn'
-  last_activity  one of the two sources behind tab 4 'Recent contact?'
+  linkedin       tab 1 'LinkedIn?' and tab 3 'LinkedIn'
+  last_activity  one of the two sources behind tab 3 'Recent contact?'
 
 `linkedin` is three-valued on purpose, and it is the reason this is not simply a
 dict of strings:

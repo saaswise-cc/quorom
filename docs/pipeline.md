@@ -175,11 +175,10 @@ to `domain_kind = 'external'`.
 **Cost:** none.
 
 **Read path served:** determines which rows exist on **tab 1 (Met this week)**
-and **tab 2 (Missing from CRM)** at all. Supplies `Name`, `Email`,
-`Company (domain)`, and the meeting titles.
+at all. Supplies `Name`, `Email`, `Company (domain)`, and the meeting titles.
 
 Attendees with neither email nor domain are suppressed as non-contacts (meeting
-bots) and listed by name at the foot of tab 2 — suppressed visibly, not dropped.
+bots) and listed by name at the foot of tab 1 — suppressed visibly, not dropped.
 
 ---
 
@@ -189,7 +188,7 @@ bots) and listed by name at the foot of tab 2 — suppressed visibly, not droppe
 **Cost:** none.
 
 **Read path served:** one row per person on tab 1 rather than one per meeting
-attended; and the company keys that tabs 3 and 4 are built on.
+attended; and the company keys that tabs 2 and 3 are built on.
 
 Deduplication is on lowercased email. Rows with no email stay distinct — they
 cannot be merged safely by name, and each is a gap worth reporting. Each gets a
@@ -219,23 +218,25 @@ and in `crm/`, and nowhere under `weekly/`: a standard field name is as much a
 coupling as a custom one, it is just spelled the same in every Salesforce org.
 `mobile` is presence only, reduced inside the adapter so the number cannot reach
 the JSON dump. `linkedin` is three-valued — a URL, `""` for nothing on file, and
-`None` for a CRM with no such field, which is what tab 1 and tab 4 render as
+`None` for a CRM with no such field, which is what tab 1 and tab 3 render as
 "not available in this CRM".
 **Cost:** none — customer-owned data in both systems.
 
 **Read path served:**
+- tab 1 — whether each person is in the CRM, and the order of the rows:
+  people not in the CRM come first. With both CRMs configured that is the pair
+  `In HubSpot?` / `In Salesforce?`, because "in HubSpot but not Salesforce" is
+  the answer they exist for; with one, a single `In CRM?`, and the tab's
+  caption names the CRM ("Checked against Salesforce."); with none, no column —
+  nobody can be missing from a CRM that was not asked.
 - tab 1 — `Title (CRM)`, `LinkedIn?`, `Mobile in CRM?`, `Flag`. The first three
-  report what a CRM holds, so with no CRM configured they are dropped rather
-  than filled — the same answer tab 2 gives below. The tab itself survives:
-  who attended comes from the meeting source. `Flag` survives too, minus its
-  `needs title` half, which is a finding about a CRM that was not asked.
-- tab 2 — `In HubSpot?`, `In Salesforce?`, and which rows appear there at all.
-  Both columns appear only when both CRMs are configured, because "in HubSpot
-  but not Salesforce" is the answer they exist for. With one CRM, a column of
-  its own would say `NO` on every row of a tab whose title already says it, so
-  neither is rendered and the tab's caption names the CRM instead ("Checked
-  against Salesforce."). With none, nothing can be missing from a CRM, and the
-  tab has no rows.
+  report what a CRM record holds. With no CRM configured they are dropped
+  rather than filled; for a person with no record they read `—`, never `no`,
+  because there is no record to have or lack anything. `Flag`'s `needs title`
+  appears only for a record that exists without one.
+
+Tab 1 used to be two tabs — everyone met, and a second tab of the people not in
+the CRM. The second was a filtered copy of the first, so they were merged.
 
 Salesforce is the source of truth for `Title`; HubSpot is the fallback. With
 both configured, a disagreement between them is itself a flag (`title differs`,
@@ -258,21 +259,21 @@ count and one `AccountId`; SF `Account` firmographics — the standard
 `hq_state` and `hq_country`; HS contact count per domain.
 **Cost:** none.
 
-**Read path served:** every column of **tab 3 (Company coverage)** —
+**Read path served:** every column of **tab 2 (Company coverage)** —
 `Company name`, `Employees`, `HQ`, `Account type`, `Meets profile?`,
 `Met this wk`, `SF contacts`, `SF focus-senior`, `HubSpot contacts` — and the
-ICP filter that decides which companies reach tab 4. The three count columns
+ICP filter that decides which companies reach tab 3. The three count columns
 appear only for a CRM that was configured: a count of contacts nobody counted
 is a 0 that reads exactly like a company with none on file.
 
 `Meets profile?` is the employee band and HQ geography from the focus profile,
 and it has **three** answers rather than two. With no CRM configured the
 firmographics it reads were never fetched, so it reports `not assessed — no CRM
-configured` instead of a verdict, and the companies stay on tab 4 as
+configured` instead of a verdict, and the companies stay on tab 3 as
 `— ICP not assessed: no CRM configured —` rather than dropping off it. Without
 that third state an unconfigured CRM fails every company on "no size" — a
 judgement about data nobody looked up — and because this column is also the
-filter feeding tab 4, it empties the stakeholder map while the workbook keeps
+filter feeding tab 3, it empties the stakeholder map while the workbook keeps
 its usual shape.
 
 **A run without an active profile stops here — before step 1, in fact.** An
@@ -318,8 +319,10 @@ external-attendee count of each meeting; SF senior bench per domain
 seniority terms).
 **Cost:** none.
 
-**Read path served:** all six columns of **tab 4 (Stakeholder list)** —
-`Company`, `Name`, `Title`, `Recent contact?`, `LinkedIn`, `Mobile in CRM?`.
+**Read path served:** all six columns of **tab 3 (Stakeholder list)** —
+`Company`, `Name`, `Title`, `Recent contact?`, `LinkedIn`, `Mobile in CRM?` —
+and its caption, which states the rule in the reader's own values: which
+companies, which seniority levels, how many per company, in what order.
 
 Ordering is two rules, no weighting: most senior first, recent contact breaking
 ties between equals. Capped at `SHORTLIST_SIZE` (3) per company — the cap is a
@@ -353,16 +356,18 @@ section happens and the output is as the steps above describe. Full detail,
 including the provider's name, its variable and its cost, in
 `docs/enrichment.md`.
 
-**Reads:** the provider — a company lookup per domain on tab 3, and a person
-lookup per email on tab 4 and on tab 2 (shared inboxes excepted). For a tab 4
+**Reads:** the provider — a company lookup per domain on tab 2, and a person
+lookup per email on tab 3 and for the people not in the CRM on tab 1 (shared
+inboxes excepted). For a tab 3
 person the email finds nothing for, a second lookup by the CRM's LinkedIn URL,
 where it holds one. One lookup per email, per LinkedIn URL and per domain per
 run. Never a phone number or a personal email.
 **Cost:** the provider's credits, per `docs/enrichment.md`.
 
-**Read path served:** tab 2 `Name (…)` and `Title (…)`; tab 3 `Employees (…)`,
-`HQ (…)` and `Profile check`; tab 4 `Still at company?`, `Title (…)` and
-`LinkedIn (…)`; **tab 5 (Review queue)**; and which companies reach tab 4 — a
+**Read path served:** tab 1 `Name (…)`, `Title (…)` and `LinkedIn (…)` for
+people not in the CRM; tab 2 `Employees (…)`, `HQ (…)` and `Profile check`;
+tab 3 `Still at company?`, `Title (…)` and `LinkedIn (…)`; **tab 4 (Review
+queue)**; and which companies reach tab 3 — a
 company whose ICP verdict the provider disputes goes on, marked
 `(profile disputed)`, because a wrong "no" otherwise removes a company from the
 map without trace. The `(…)` is the provider's display name.
@@ -386,7 +391,7 @@ another source.
 
 ## Step 6 — Emit
 
-**Writes:** a local `.xlsx` (four tabs, provenance per row; a fifth, the review
+**Writes:** a local `.xlsx` (three tabs; a fourth, the review
 queue, with an enrichment provider) and a JSON dump of every input — focus
 profile, seniority terms, observed `Account.Type` values, coverage, meeting
 history, the SF bench, the shortlist, the `Contact` describe, and with a

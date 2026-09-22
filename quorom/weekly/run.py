@@ -85,14 +85,14 @@ def run_weekly(cfg: Config, log=print) -> dict:
     if not sf.configured:
         log(
             "[i] Salesforce not configured — its columns are omitted, and the ICP "
-            "test cannot run: tab 3 will read 'not assessed' rather than a verdict."
+            "test cannot run: tab 2 will read 'not assessed' rather than a verdict."
         )
     elif sf._cfg.uses_client_credentials:
         log("[i] Salesforce: client-credentials flow.")
     else:
         log("[i] Salesforce: pasted token (expires ~2h — see docs/salesforce-access.md).")
     if not hs.configured:
-        log("[i] HubSpot not configured — its columns are omitted from tabs 2 and 3.")
+        log("[i] HubSpot not configured — its columns are omitted from tabs 1 and 2.")
 
     # The enrichment provider's one free call, made here — before the database
     # is read or a CRM is called — for the reason every other guard in this
@@ -210,7 +210,7 @@ def run_weekly(cfg: Config, log=print) -> dict:
             log(
                 f"[!] ICP test did not run for {len(undetermined)} of {len(coverage)} "
                 "companies — no CRM configured, so no firmographics were fetched. "
-                "They are reported as 'not assessed' on tabs 3 and 4, not dropped."
+                "They are reported as 'not assessed' on tabs 2 and 3, not dropped."
             )
         if cfg.customer_account_types:
             fits = sum(1 for c in coverage if c["meets"] == "yes")
@@ -229,7 +229,7 @@ def run_weekly(cfg: Config, log=print) -> dict:
 
         # Step 5 — the stakeholder list
         terms = coverage_mod.seniority_terms(profile)
-        # The same set tab 4 will render, so history is fetched for every company
+        # The same set tab 3 will render, so history is fetched for every company
         # that reaches the map rather than for confirmed targets alone.
         mapped = stakeholders_mod.companies_for_map(coverage)
         history = db.met_history(conn, cfg, [c["domain"] for c in mapped])
@@ -272,7 +272,7 @@ def run_weekly(cfg: Config, log=print) -> dict:
     xlsx_path = os.path.join(cfg.output_dir, f"weekly_stakeholder_map_{week}.xlsx")
     workbook_mod.build_workbook(
         cfg, reconciled, coverage, suppressed, stakeholders, xlsx_path,
-        # The ICP test states itself on tab 3 in the reader's own numbers, so
+        # The ICP test states itself on tab 2 in the reader's own numbers, so
         # the profile and the geography label it was parsed into both have to
         # reach the workbook rather than being described in the abstract.
         profile=profile,
