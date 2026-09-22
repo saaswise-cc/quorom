@@ -972,7 +972,7 @@ The tabs:
 | **1 — Met this week** | Who attended from outside, one row per person: whether each is in your CRM, and for those who are, their CRM title, LinkedIn and whether a mobile number is on file. People not in the CRM are listed first, with `—` in the CRM columns — there is no record to read. Attendees with neither email nor domain (meeting bots) are listed at the foot — suppressed visibly, not dropped. |
 | **2 — Company coverage** | Every external company met: size, HQ, whether it meets your profile, how many contacts you hold |
 | **3 — Stakeholder list** | The map. The senior people in your CRM at the ICP-fit companies worth considering, capped at `SHORTLIST_SIZE` each. Its caption states the rule in your profile's terms |
-| **4 — Review queue** | Only with an enrichment provider configured: where your CRM and the provider disagree, for a person to settle. The provider's values also appear beside the CRM's on tabs 1, 2 and 3 — `docs/enrichment.md` |
+| **4 — Review queue** | Only with an enrichment provider configured: where your CRM and the provider disagree, for a person to settle. Its `Company` column is the CRM account's name, falling back to the domain only where no account matched — the other tabs key on the domain, so a script filtering this one by domain will miss rows. The provider's values also appear beside the CRM's on tabs 1, 2 and 3 — `docs/enrichment.md` |
 
 **`docs/reading-your-first-run.md` is what to send to whoever receives this
 file.** It covers what to check first to know the run worked, what looks

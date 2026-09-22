@@ -111,12 +111,13 @@ open. Rows found this way say so: `… (matched on LinkedIn)`.
 The email lookup always runs first and its rule does not change. Where the email
 is accepted, a LinkedIn search would return the same record, so it is not made.
 
-On one real week, 18 stakeholders were not found by email. 15 of them had a
-LinkedIn URL in the CRM; for 13 of those, the URL search returned the same
-handle under the same name. Anything still unmatched reads
-**"not found in LeadIQ"** — never inferred, never filled from elsewhere. The run
-log states each week how many stakeholders were matched on email and how many on
-LinkedIn.
+**Why the fallback is there at all**: on the week it was built against, most
+of the stakeholders the email missed had a LinkedIn URL in the CRM, and most of
+those matched on handle and name. Whether that holds for your CRM depends on
+how well the LinkedIn field is filled, so the run log states each week how many
+stakeholders were matched on email and how many on LinkedIn — measure yours
+rather than borrowing these. Anything still unmatched reads
+**"not found in LeadIQ"** — never inferred, never filled from elsewhere.
 
 ---
 
@@ -170,6 +171,12 @@ marked stale.
 thing a person should settle, most consequential first, each saying what to
 check and where:
 
+**Its `Company` column is the CRM account's name**, falling back to the domain
+only where no account matched — unlike Company coverage, whose `Company` column
+is the domain met. A script filtering this tab by domain will report a row
+missing that is present under the account's name. Match on both, or read the
+domain from Company coverage.
+
 | What | When |
 |---|---|
 | Profile fit disputed | The two sources give different ICP answers |
@@ -217,12 +224,22 @@ records the account has already unlocked may be free — so do not rely on it.
 This module never selects a phone number, so a person lookup costs at most the
 record.
 
-**A week's spend at rate-card prices, from one real week's counts** (33
-companies met, 40 people on the stakeholder list and 19 not in the CRM): about
-60 person lookups by email and 15 by LinkedIn URL — the second only for people
-the email missed — plus 33 company lookups. That is about 75 credits for person
-records, plus about 100 if company lookups are charged at 3: **at most about 175
-a week**, and possibly far less. An estimate, not a measurement.
+**A week's spend at rate-card prices — work it out from your own counts.**
+The run makes one company lookup per company met; one person lookup per person
+on the stakeholder list and per person met who is not in your CRM, minus shared
+inboxes, which are never looked up; and a LinkedIn lookup only for the people
+the email missed. Each of those is one record. So:
+
+```
+credits ≈ (people looked up × 1) + (companies met × 3)
+```
+
+For a week with 30 companies met and 50 people looked up — round numbers to
+show the arithmetic, not a measurement — that is about 50 credits for person
+records plus about 90 for company records: **under 150 for the week**, and
+possibly far less, since the lookups measured above cost nothing at all. An
+estimate, not a measurement. The Summary tab carries the counts your own
+arithmetic needs.
 
 **Measuring it yourself: the balance may be shared.** The `account` query
 reports the plan's balance, and on a plan shared by a whole company everyone

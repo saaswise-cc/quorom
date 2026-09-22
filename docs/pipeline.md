@@ -91,9 +91,9 @@ type rules out, counts how many rows actually have each survivor populated, and
 stores them **in count order**.
 
 **A list per logical field, not a winner.** The first populated value wins at
-read time. On one real org, three of the thirty-nine companies met in a single
-week had an empty package country and a populated `BillingCountry`; a
-single-name map would blank their HQ and drop one of them out of the ICP set.
+read time. On one real org, a handful of the companies met in a single week had
+an empty package country and a populated `BillingCountry`; a single-name map
+would blank their HQ and drop at least one of them out of the ICP set.
 
 **Counting alone is not enough.** On the same org the best-populated field
 matching `/linkedin/` on `Contact` is the *company's* page, beating the

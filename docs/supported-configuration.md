@@ -39,14 +39,14 @@ candidate was rejected.
 Two details worth knowing, because both were forced by real data rather than
 designed in advance:
 
-**The map keeps a list, not a winner.** Three of the 39 companies in one real
-week had an empty country in one source and a populated one in another. A map
-that stored only the best-populated field would have blanked their HQ and
-dropped one company out of the ICP set entirely.
+**The map keeps a list, not a winner.** In one real week, several of the
+companies met had an empty country in one source and a populated one in
+another. A map that stored only the best-populated field would have blanked
+their HQ and dropped at least one company out of the ICP set entirely.
 
 **Population alone picks the wrong field.** In one org the best-populated field
-matching `/linkedin/` on `Contact` was the *company's* LinkedIn page at 60.4%,
-not the person's. Counting tells you which field has data, not which field means
+matching `/linkedin/` on `Contact` was the *company's* LinkedIn page, by some
+margin, not the person's. Counting tells you which field has data, not which field means
 what you want. That is why exclusion patterns carry as much weight as inclusion
 ones, and why every rejection is stored with the rule that rejected it — so a
 wrong match is visible instead of silent.
