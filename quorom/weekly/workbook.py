@@ -1,5 +1,5 @@
-"""Step 6 — emit. Three tabs, and a fourth — the review queue — when an
-enrichment provider is configured.
+"""Step 6 — emit. A summary and three tabs, and a fourth tab — the review
+queue — when an enrichment provider is configured.
 
 Nothing is written back to any system. The workbook and the JSON dump are the
 only outputs, and the dump redacts MobilePhone to a boolean: sensitive contact
@@ -125,6 +125,7 @@ def build_workbook(
     geo_label: str,
     enrichment: Optional[str] = None,
     queue: Optional[list[dict]] = None,
+    summary: Optional[list[dict]] = None,
 ) -> None:
     """`enrichment` is the configured provider's display name, or None.
 
@@ -135,6 +136,21 @@ def build_workbook(
     other = enrichment
     wb = Workbook()
     wb.remove(wb.active)
+
+    # Summary — first, unnumbered: it is not a list to work through but the
+    # counts of the tabs that are. Built by weekly/summary.py.
+    if summary is not None:
+        ws0 = _sheet(wb, "Summary", ["Tab", "What", "Count", "Out of"])
+        for st in summary:
+            ws0.append([st["area"], st["what"], st["count"], st["out_of"]])
+        ws0.append([])
+        ws0.append(
+            [
+                "Each count is a count of rows on the tab named, so any of them can be "
+                "checked there. The one exception is recent contact, which reads every "
+                "senior CRM contact at the company, not only the people listed."
+            ]
+        )
 
     # Tab 1 — Met this week: everyone met, one row per person, and whether each
     # is in the CRM.

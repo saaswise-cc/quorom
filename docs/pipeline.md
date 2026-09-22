@@ -391,15 +391,28 @@ another source.
 
 ## Step 6 — Emit
 
-**Writes:** a local `.xlsx` (three tabs; a fourth, the review
-queue, with an enrichment provider) and a JSON dump of every input — focus
+**Writes:** a local `.xlsx` (a Summary tab and three numbered tabs; a fourth,
+the review queue, with an enrichment provider), `summary_<week>.json` with the
+Summary tab's counts, and a JSON dump of every input — focus
 profile, seniority terms, observed `Account.Type` values, coverage, meeting
 history, the SF bench, the shortlist, the `Contact` describe, and with a
 provider its values on each coverage and shortlist row, its name, and the
-review queue.
+review queue, plus the summary.
 
-**Read path served:** the artifact itself; and the JSON is what lets the ranking
-be re-tuned without re-running Salesforce.
+**The summary** counts rows the other tabs already carry, each with its
+denominator: companies met and how many fit the profile; of those, how many had
+someone at the profile's seniority contacted in the last `RECENT_DAYS`; people
+met, how many are not in the CRM and — with a provider — how many it found;
+CRM records among people met, and people on the stakeholder list, lacking a
+title, LinkedIn or mobile; and review-queue rows by kind, zeros included. A
+count whose source was not configured is absent, not zero. The one count not
+read off a tab is recent senior contact: it asks of the whole CRM bench, not
+the capped list, so it does not move with `SHORTLIST_SIZE`.
+
+**Read path served:** the artifact itself; the summary is what a reader sees
+first and what a delivery step posts; and the JSON is what lets the ranking be
+re-tuned without re-running Salesforce, and — because retention keeps it — what
+makes the counts comparable week to week.
 
 Nothing is written back to any system. `MobilePhone` is reduced to a boolean in
 the dump — sensitive contact fields pass through to the CRM, never into a
@@ -425,8 +438,8 @@ WEEK_START=2026-08-17 quorom weekly                # the artifact
 ```
 
 `quorom weekly` writes into `OUTPUT_DIR`: the workbook, the JSON dump of every
-input, the single-page HTML view, and `last_run.json` — the manifest naming
-those three and the week they belong to, so a delivery or archival step can find
+input, the summary's counts, the single-page HTML view, and `last_run.json` —
+the manifest naming those four and the week they belong to, so a delivery or archival step can find
 them without rebuilding the filename pattern or parsing the run's log. It writes
 nothing anywhere else.
 

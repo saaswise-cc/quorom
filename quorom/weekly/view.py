@@ -48,6 +48,7 @@ a{color:inherit;text-decoration:none;border-bottom:1px dotted #999}
 # words, so the page cannot drift from the workbook the way a hardcoded second
 # copy did.
 SECTIONS = [
+    ("Summary", "Summary"),
     ("2 - Company coverage", "Company coverage"),
     ("3 - Stakeholder list", "Stakeholder list"),
     # Present only when an enrichment provider is configured; skipped otherwise

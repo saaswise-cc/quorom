@@ -20,6 +20,7 @@ from . import enrichment as enrichment_mod
 from . import people as people_mod
 from . import retention as retention_mod
 from . import stakeholders as stakeholders_mod
+from . import summary as summary_mod
 from . import view as view_mod
 from . import workbook as workbook_mod
 
@@ -269,6 +270,12 @@ def run_weekly(cfg: Config, log=print) -> dict:
 
     # Step 6 — emit
     week = start[:10]
+    summary = summary_mod.build(
+        cfg, reconciled, coverage, stakeholders, bench_raw, profile,
+        enrichment=provider.display_name if provider else None,
+        queue=queue,
+        queue_kinds=enrichment_mod.QUEUE_ORDER,
+    )
     xlsx_path = os.path.join(cfg.output_dir, f"weekly_stakeholder_map_{week}.xlsx")
     workbook_mod.build_workbook(
         cfg, reconciled, coverage, suppressed, stakeholders, xlsx_path,
@@ -279,6 +286,7 @@ def run_weekly(cfg: Config, log=print) -> dict:
         geo_label=geography.prose_label(selections),
         enrichment=provider.display_name if provider else None,
         queue=queue,
+        summary=summary,
     )
     log(f"[✓] Wrote {xlsx_path}")
 
@@ -304,9 +312,18 @@ def run_weekly(cfg: Config, log=print) -> dict:
             # stakeholders above, or null. Null means none was asked.
             "enrichment_provider": provider.display_name if provider else None,
             "review_queue": queue,
+            # Also here, not only in its own file: this dump is what retention
+            # keeps, and counts over time are what the summary is for.
+            "summary": summary,
         },
     )
     log(f"[✓] Wrote {json_path}")
+
+    # Its own small file, named by the manifest, so a delivery step can post
+    # the counts without opening the workbook or parsing the log.
+    summary_path = os.path.join(cfg.output_dir, f"summary_{week}.json")
+    summary_mod.write(summary_path, week, summary)
+    log(f"[✓] Wrote {summary_path}")
 
     html_path = view_mod.render(xlsx_path, cfg.account)
     log(f"[✓] Wrote {html_path}")
@@ -339,6 +356,10 @@ def run_weekly(cfg: Config, log=print) -> dict:
         "xlsx": os.path.abspath(xlsx_path),
         "json": os.path.abspath(json_path),
         "html": os.path.abspath(html_path),
+        # Added after the manifest first shipped, without a schema bump: a key
+        # a reader does not know is one it can ignore. A reader that wants it
+        # has to allow for its absence on a run from an older version.
+        "summary": os.path.abspath(summary_path),
     }
     manifest_path = os.path.join(cfg.output_dir, "last_run.json")
     with open(manifest_path, "w", encoding="utf-8") as fh:
@@ -350,6 +371,7 @@ def run_weekly(cfg: Config, log=print) -> dict:
         "xlsx": manifest["xlsx"],
         "json": manifest["json"],
         "html": manifest["html"],
+        "summary": manifest["summary"],
         "week_start": week,
         "manifest": manifest_path,
     }

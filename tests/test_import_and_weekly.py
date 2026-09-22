@@ -148,6 +148,7 @@ def test_weekly_runs_without_a_crm(database, gong_calls, tmp_path):
 
     wb = load_workbook(paths["xlsx"])
     assert wb.sheetnames == [
+        "Summary",
         "1 - Met this week",
         "2 - Company coverage",
         "3 - Stakeholder list",
@@ -418,16 +419,49 @@ def test_manifest_names_this_runs_files(database, gong_calls, tmp_path):
     assert paths["manifest"] == str(manifest_path)
 
     manifest = json.loads(manifest_path.read_text())
-    assert sorted(manifest) == ["html", "json", "schema", "week_start", "xlsx"]
+    assert sorted(manifest) == ["html", "json", "schema", "summary", "week_start", "xlsx"]
+    # `summary` was added without a bump: new keys are ignorable, so a reader
+    # pinned to schema 1 keeps working.
     assert manifest["schema"] == 1
     assert manifest["week_start"] == "2026-08-17"
 
-    for key in ("xlsx", "json", "html"):
+    for key in ("xlsx", "json", "html", "summary"):
         # Absolute, because the reader is a separate process that need not
         # share this one's working directory.
         assert os.path.isabs(manifest[key])
         assert os.path.exists(manifest[key])
         assert manifest[key] == paths[key]
+
+
+def test_the_summary_is_a_tab_a_file_and_part_of_the_dump(database, gong_calls, tmp_path):
+    """Three places, one set of numbers: the Summary tab a reader sees first,
+    the small file a delivery step posts from, and the inputs dump retention
+    keeps — which is what makes the counts comparable week to week."""
+    account_id = _seed_account(database)
+    _import(database, account_id, gong_calls)
+    _seed_profile(database, account_id)
+
+    paths = run_weekly(_cfg(database, tmp_path), log=lambda *_: None)
+
+    wb = load_workbook(paths["xlsx"])
+    assert wb.sheetnames[0] == "Summary"
+    assert _headers(wb["Summary"]) == ["Tab", "What", "Count", "Out of"]
+
+    summary = json.loads(open(paths["summary"]).read())
+    assert summary["schema"] == 1
+    assert summary["week_start"] == "2026-08-17"
+    stats = {s["key"]: s for s in summary["stats"]}
+    # The same count as the rows on tab 1: the 11 people the no-CRM test
+    # counts there.
+    assert stats["people_met"]["count"] == 11
+    # No CRM in this configuration, so nothing a CRM would have answered.
+    assert "people_not_in_crm" not in stats
+
+    dump = json.loads(open(paths["json"]).read())
+    assert dump["summary"] == summary["stats"]
+
+    html = open(paths["html"]).read()
+    assert html.index("<h2>Summary") < html.index("<h2>Company coverage")
 
 
 def test_manifest_is_written_only_after_retention_succeeds(

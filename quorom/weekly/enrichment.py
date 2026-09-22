@@ -234,6 +234,8 @@ def not_in_crm(pass_: _Cached, reconciled: list[dict]) -> None:
             r["other_linkedin"] = ""
             continue
         p = pass_.person(r.get("email"))
+        # Read by the summary's count, so it does not have to parse the cell.
+        r["other_found"] = p is not None
         if p is None:
             r["other_name"], r["other_title"], r["other_linkedin"] = not_found(pass_.provider), "", ""
         else:

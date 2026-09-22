@@ -27,6 +27,12 @@ which legs actually ran.
    check point 2 first, because an unassessed company cannot pass a filter it
    was never tested against.
 
+**The Summary tab, first in the file, is the same check in numbers.** A line
+missing from it is a source that was not configured — there is no "not in your
+CRM" count without a CRM — which is different from a line reading 0. Every
+count is out of something; read the two together. Each is a count of rows on
+the tab it names, so a number that looks wrong can be checked there.
+
 Blank and false are different everywhere in this output. **Blank means the test
 did not run. False means it ran and the answer was no.** A column of blanks is
 a configuration fact about your deployment; a column of falses is a finding

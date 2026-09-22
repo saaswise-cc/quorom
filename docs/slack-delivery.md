@@ -67,7 +67,7 @@ found" — after the weekly run has already done all its work.
 ## Finding the files: read the manifest
 
 `quorom weekly` writes `last_run.json` into `OUTPUT_DIR` as its final step —
-the three output paths and the week they belong to (§12). **Read that.** The
+the output paths and the week they belong to (§12). **Read that.** The
 two alternatives both look reasonable and are both traps: rebuilding the
 filename pattern yourself couples your script to names upstream can change, and
 scraping the `[✓] Wrote …` log lines couples it to log output, which is not an
@@ -119,6 +119,19 @@ def load_manifest(output_dir: Path) -> dict:
     return manifest
 
 
+def summary_lines(manifest: dict) -> list[str]:
+    """The Summary tab's counts, one line each. A run from a version before the
+    summary existed has no `summary` key — post the files without it."""
+    if "summary" not in manifest:
+        return []
+    stats = json.loads(Path(manifest["summary"]).read_text())["stats"]
+    return [
+        f"• {s['what']}: {s['count']}"
+        + (f" of {s['out_of']}" if s["out_of"] is not None else "")
+        for s in stats
+    ]
+
+
 def deliver(manifest: dict) -> None:
     token = os.environ.get("SLACK_BOT_TOKEN")
     channel = os.environ.get("SLACK_CHANNEL_ID")
@@ -136,7 +149,9 @@ def deliver(manifest: dict) -> None:
     try:
         WebClient(token=token).files_upload_v2(
             channel=channel,
-            initial_comment=f"Quorom weekly run — week of {week}",
+            initial_comment="\n".join(
+                [f"Quorom weekly run — week of {week}"] + summary_lines(manifest)
+            ),
             file_uploads=uploads,
         )
     except SlackApiError as e:
@@ -151,10 +166,11 @@ Titles come from the filenames in the manifest rather than being composed in
 the script — same reason as reading the manifest at all. Earlier drafts of this
 file composed them by hand and got both names wrong.
 
-The `.json` output isn't posted here — it's raw structured data, not something
+The inputs `.json` isn't posted here — it's raw structured data, not something
 a person reads in Slack, and it contains every input the run read. Add it as a
 third upload if your team wants it, bearing in mind it is the most sensitive of
-the three.
+the files. The summary is posted as text instead: it holds counts only, no
+names.
 
 ## Delivery is not retention
 

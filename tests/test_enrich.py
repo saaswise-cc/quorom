@@ -319,6 +319,47 @@ def test_people_not_in_the_crm_get_a_name_title_and_linkedin(tmp_path):
     assert by["dana@acme.example"]["Name (Example)"] in (None, "")
 
 
+def test_the_summary_counts_what_the_provider_found_and_the_queue(tmp_path):
+    """Ari is found; Kim and Pat are not; the shared inbox is never looked up,
+    so it is in neither number."""
+    from quorom.weekly import summary as summary_mod
+
+    cfg, sf, hs = _cfg(), _SF(), _HS()
+    people = _attendees()
+    reconciled = [people_mod.reconcile(p, sf, hs) for p in people]
+    coverage = coverage_mod.build_coverage(
+        cfg, people_mod.group_companies(people), PROFILE, sf, hs, log=lambda *_: None
+    )
+    pass_ = enrichment.start(_Provider())
+    enrichment.companies(pass_, coverage, PROFILE)
+    rows, raw = stakeholders_mod.build(
+        cfg, coverage, coverage_mod.seniority_terms(PROFILE), {}, sf
+    )
+    enrichment.stakeholders(pass_, rows)
+    enrichment.not_in_crm(pass_, reconciled)
+    queue = enrichment.review_queue(pass_, coverage, rows)
+
+    stats = summary_mod.build(
+        cfg, reconciled, coverage, rows, raw, PROFILE, enrichment="Example",
+        queue=queue, queue_kinds=enrichment.QUEUE_ORDER,
+    )
+    by = {s["key"]: (s["count"], s["out_of"]) for s in stats}
+
+    assert by["people_not_in_crm"] == (4, 6)
+    assert by["people_not_in_crm_found"] == (1, 3)
+    kinds = [s["key"][len("queue:"):] for s in stats if s["key"].startswith("queue:")]
+    assert kinds[: len(enrichment.QUEUE_ORDER)] == list(enrichment.QUEUE_ORDER)
+    assert sum(s["count"] for s in stats if s["key"].startswith("queue:")) == len(queue)
+
+    xlsx = str(tmp_path / "weekly_stakeholder_map_2026-08-17.xlsx")
+    workbook_mod.build_workbook(
+        cfg, reconciled, coverage, [], rows, xlsx, profile=PROFILE,
+        geo_label="North America", enrichment="Example", queue=queue, summary=stats,
+    )
+    html = open(view_mod.render(xlsx, "example.com")).read()
+    assert "Not in your CRM, and found by Example" in html
+
+
 def test_each_person_and_company_is_looked_up_once_and_inboxes_never(tmp_path):
     provider = _Provider()
     _run(tmp_path, provider)

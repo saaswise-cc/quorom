@@ -1,7 +1,7 @@
 # Enrichment — a second opinion beside your CRM
 
 Optional. With no provider configured, a run and its output are exactly what
-`setup.md` describes: three tabs, nothing called, nothing spent. This file
+`setup.md` describes: a summary and three tabs, nothing called, nothing spent. This file
 covers what changes when one is configured.
 
 **The one provider implemented is LeadIQ**, through its GraphQL API. Nothing
@@ -184,6 +184,11 @@ check and where:
 through its Website field, so one wrong value there pulls another company's
 contacts in under it. Only someone correcting the account in the CRM can fix
 that; the queue says where to look.
+
+**The Summary tab** gains two things: how many of the people not in your CRM
+the provider found, out of those it looked up (shared inboxes are not), and
+one row per review-queue kind with its count — zeros included, so a kind
+dropping to zero week on week is visible.
 
 The JSON dump carries the same: each company and stakeholder row holds the
 provider's values, `enrichment_provider` names the provider (null when none was

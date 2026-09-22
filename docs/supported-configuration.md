@@ -17,7 +17,7 @@ ICP-test work, and again on 2026-09-21 when the enrichment provider was added.
 | **ICP: account type** | Optional substring gate | Off by default |
 | **Seniority** | Title matching | C-level, VP, director, founder, manager |
 | **Database** | PostgreSQL 13+ | `gen_random_uuid()` is built in from 13 |
-| **Delivery** | Local files | A workbook, a JSON dump and an HTML page |
+| **Delivery** | Local files | A workbook, a JSON dump, a summary JSON and an HTML page |
 | **Scheduling** | None | The repo defines no packaging or scheduling |
 | **Enrichment providers** | One, optional | Off unless its key is set, and then the output is unchanged apart from the provider's columns and tab 4. Never replaces a CRM value — `docs/enrichment.md` |
 

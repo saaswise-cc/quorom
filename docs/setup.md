@@ -787,7 +787,7 @@ output and want to change something:
 | `GROUP_CALL_MIN` | 8 | Above this many external attendees, a meeting is labelled a group call on the row — so a training webinar does not read as a relationship. |
 | `WEEK_START` | current week | Monday of the target week, `YYYY-MM-DD`. Unset, it means the week **containing today** — which is not the same as last week, and is the trap section 13 exists to warn about. Read §13 before scheduling anything. |
 | `TZ_OFFSET` | `-04` | The offset the week boundaries are cut on. |
-| `OUTPUT_DIR` | `output` | Where a run's output lands — the workbook, the JSON, the HTML view and `last_run.json`. |
+| `OUTPUT_DIR` | `output` | Where a run's output lands — the workbook, the JSON dump, the summary, the HTML view and `last_run.json`. |
 | `CUSTOMER_ACCOUNT_TYPES` | empty | Substrings of `Account.Type` marking an existing customer. Empty means the gate is off and ICP fit is employee band plus HQ geography only. Leave it off unless your `Type` field is genuinely maintained as a lifecycle field. |
 | `RETAIN_RUNS` | `false` | Store this run's `.xlsx`, `.json` and `.html` into `run_outputs` as the last step of `quorom weekly`. Off by default — a deployment that has not chosen retention must not silently start storing contact data. Section 14 has the migration and the grant this needs before turning it on. |
 
@@ -910,18 +910,19 @@ WEEK_START=2026-08-17 quorom weekly
 It writes into `OUTPUT_DIR` and nowhere else — no writes back to Gong,
 Salesforce, HubSpot or anywhere in your CRM:
 
-- `weekly_stakeholder_map_<week>.xlsx` — the artifact, three tabs (four with
-  an enrichment provider configured)
+- `weekly_stakeholder_map_<week>.xlsx` — the artifact: a Summary tab and three
+  numbered tabs (four with an enrichment provider configured)
 - `stakeholder_inputs_<week>.json` — every input the run read
+- `summary_<week>.json` — the Summary tab's counts, for a delivery step to post
 - `weekly_view_<week>.html` — a single-page view of the same thing
-- `last_run.json` — the manifest: the three paths above, plus the week they
+- `last_run.json` — the manifest: the four paths above, plus the week they
   belong to. Overwritten by each run.
 
 **The HTML is rendered from the `.xlsx`, not generated alongside it.** The run
 writes the workbook first and then reads it back to build the view, so the two
 cannot disagree — but it also means the `.xlsx` has to exist, at that path, at
 that moment. If your deployment moves or cleans up output files as part of the
-run, do it after all four are written, not between them.
+run, do it after all five are written, not between them.
 
 **Opening them.** `open <your OUTPUT_DIR>/` shows the folder, or open one
 directly — `open <your OUTPUT_DIR>/weekly_stakeholder_map_<week>.xlsx` for the
@@ -941,6 +942,7 @@ so a future change to its shape is something you can detect:
   "html": "/srv/quorom/output/weekly_view_2026-08-17.html",
   "json": "/srv/quorom/output/stakeholder_inputs_2026-08-17.json",
   "schema": 1,
+  "summary": "/srv/quorom/output/summary_2026-08-17.json",
   "week_start": "2026-08-17",
   "xlsx": "/srv/quorom/output/weekly_stakeholder_map_2026-08-17.xlsx"
 }
@@ -950,10 +952,23 @@ Paths are absolute, so a delivery step does not have to share the run's working
 directory. The manifest is written last, after retention — so if it is there,
 the run finished.
 
+**`summary` is newer than the manifest, and did not bump `schema`.** A key a
+reader does not know is one it can ignore, so a delivery step checking for
+schema 1 keeps working. The other direction is the one to handle: a deployment
+pinned to a version from before the summary has no `summary` key, whatever this
+guide says. A delivery step that uses it should treat it as optional.
+
+`summary_<week>.json` holds `schema`, `week_start` and `stats` — a list in the
+order the Summary tab shows them, each with a stable `key`, the `what` a person
+reads, its `count`, and `out_of` (null where a count has no denominator). A
+count whose source was not configured is absent, not zero. The same list is in
+the inputs dump under `summary`, which is the copy retention keeps.
+
 The tabs:
 
 | Tab | What it answers |
 |---|---|
+| **Summary** | The run in counts, each out of its denominator: companies met and how many fit your profile; of those, how many had someone senior contacted recently; people met, how many are not in your CRM, and how many CRM records lack a title, LinkedIn or mobile; the same gaps on the stakeholder list; and, with a provider, the review queue by kind. Each count is a count of rows on the tab it names |
 | **1 — Met this week** | Who attended from outside, one row per person: whether each is in your CRM, and for those who are, their CRM title, LinkedIn and whether a mobile number is on file. People not in the CRM are listed first, with `—` in the CRM columns — there is no record to read. Attendees with neither email nor domain (meeting bots) are listed at the foot — suppressed visibly, not dropped. |
 | **2 — Company coverage** | Every external company met: size, HQ, whether it meets your profile, how many contacts you hold |
 | **3 — Stakeholder list** | The map. The senior people in your CRM at the ICP-fit companies worth considering, capped at `SHORTLIST_SIZE` each. Its caption states the rule in your profile's terms |

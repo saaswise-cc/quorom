@@ -175,6 +175,9 @@ def build(
                 # still lets the ranking be re-tuned without re-querying —
                 # reading a field name out of it would put the coupling back.
                 "bench": [c.provenance for c in bench],
+                # Overwritten below once the bench is scored; an empty bench
+                # has nobody to have contacted.
+                "any_recent_contact": False,
             }
         )
 
@@ -223,6 +226,11 @@ def build(
                     "_email": email,
                 }
             )
+
+        # Across the whole bench, not the capped list: the summary asks whether
+        # anyone senior at the company was contacted recently, and the answer
+        # must not depend on SHORTLIST_SIZE.
+        raw[-1]["any_recent_contact"] = any(x["_recent"] for x in scored)
 
         scored.sort(key=lambda x: (-x["_seniority"], not x["_recent"]))
         rows.extend(scored[: cfg.shortlist_size])
