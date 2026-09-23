@@ -114,10 +114,9 @@ def cell(col: str, value: str) -> tuple[str, str]:
         return "na", v
     if col == "Meets profile?":
         return ("ok", v) if v == "yes" else ("rej", v)
-    # Reserved for a real finding. "no mobile on file" used to land here as
-    # "GAP" and is now a plain "no" — it is a fact about a contact record, not
-    # a defect in one, and colouring it made a page of ordinary rows read as a
-    # page of problems.
+    # Reserved for a real finding. A missing mobile number is not one: it is a
+    # fact about a contact record rather than a defect in one, and colouring it
+    # makes a page of ordinary rows read as a page of problems.
     if v == "NO":
         return "", f'<span class="no">{v}</span>'
     if col == "Recent contact?":

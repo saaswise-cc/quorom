@@ -19,7 +19,7 @@ Two things to know about how it writes:
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Sequence
 
 import psycopg
 
@@ -122,19 +122,3 @@ def deduplicate_attendees(
 
     return created
 
-
-def resolved_email_key(
-    conn: psycopg.Connection, account_id: str, email: str
-) -> Optional[str]:
-    """The person id an email resolves to, or None.
-
-    Not used by the weekly run yet — MET_HISTORY_SQL still groups by email. This
-    is the seam the history query grows into when the identity read path lands.
-    """
-    with conn.cursor() as cur:
-        cur.execute(
-            "select person_id from person_identifiers where account_id = %s and email = %s",
-            (account_id, email.lower()),
-        )
-        row = cur.fetchone()
-    return str(row[0]) if row else None

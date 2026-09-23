@@ -1,17 +1,17 @@
 """`quorom init` — the two rows a fresh deployment cannot start without.
 
 The migrations create empty tables. Two rows have to exist before the pipeline
-does anything useful, and until now nothing created either of them:
+does anything useful, and this is what creates them:
 
   * the **account**, which every query in the product scopes on and which the
     importer reads `internal_domains` from to tell a colleague from a customer.
     Without it `quorom import` stops and says so.
 
   * the **active focus profile**, which carries the ICP test (employee band, HQ
-    geography) and the seniority bar behind the stakeholder list. Without it the
-    weekly run used to log a warning and carry on with every company met passing
-    the ICP test — an artifact that looks entirely normal and is wrong. That is
-    now a hard error in `quorom.weekly.run`; this module is how you satisfy it.
+    geography) and the seniority bar behind the stakeholder list. Without it a
+    run would have no ICP test to apply, and every company met would pass — an
+    artifact that looks entirely normal and is wrong. `quorom.weekly.run`
+    refuses to start without one; this module is how you satisfy it.
 
 A third row is written where a CRM is reachable: the **resolved field map**
 (`crm/fieldmap.py`), which is what lets every Salesforce query name

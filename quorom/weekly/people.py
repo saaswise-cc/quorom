@@ -147,12 +147,9 @@ def _linkedin_presence(sf: Salesforce, contact: Optional[Contact]):
     True/False — the CRM has a LinkedIn field and this person does or does not
     have one on file. None — the CRM has no such field at all, which the column
     states rather than rendering as an absent URL. NOT_CHECKED — no CRM was
-    configured, so nothing was asked about this person at all.
-
-    That last one used to answer False, which rendered as a blank cell
-    indistinguishable from "we looked and they have no LinkedIn". This
-    function's own docstring named that as the conflation the old gap tab had fixed, and
-    deferred it. It is no longer deferred.
+    configured, so nothing was asked about this person at all — which must not
+    render as a blank cell, indistinguishable from "we looked and they have no
+    LinkedIn".
     """
     if not sf.configured:
         return NOT_CHECKED

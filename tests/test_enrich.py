@@ -186,7 +186,7 @@ def _run(tmp_path, provider):
     people = _attendees()
     reconciled = [people_mod.reconcile(p, sf, hs) for p in people]
     coverage = coverage_mod.build_coverage(
-        cfg, people_mod.group_companies(people), PROFILE, sf, hs, log=lambda *_: None
+        cfg, people_mod.group_companies(people), PROFILE, sf, hs
     )
     pass_ = enrichment.start(provider)
     queue = []
@@ -328,7 +328,7 @@ def test_the_summary_counts_what_the_provider_found_and_the_queue(tmp_path):
     people = _attendees()
     reconciled = [people_mod.reconcile(p, sf, hs) for p in people]
     coverage = coverage_mod.build_coverage(
-        cfg, people_mod.group_companies(people), PROFILE, sf, hs, log=lambda *_: None
+        cfg, people_mod.group_companies(people), PROFILE, sf, hs
     )
     pass_ = enrichment.start(_Provider())
     enrichment.companies(pass_, coverage, PROFILE)
@@ -433,7 +433,7 @@ def test_two_configured_providers_are_refused(monkeypatch):
 # --- run.py wiring, against the real database -------------------------------- #
 
 
-def test_the_weekly_run_checks_the_provider_first_and_adds_tab_5(
+def test_the_weekly_run_checks_the_provider_first_and_adds_the_review_queue(
     database, gong_calls, tmp_path, monkeypatch
 ):
     """The order is the point: the provider's free check runs before the

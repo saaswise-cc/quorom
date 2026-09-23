@@ -10,7 +10,8 @@
 -- titles are senior enough to list. It is not per-contact scoring — there is
 -- no such feature here, and the profile is not a ranking input.
 --
--- Read by FOCUS_PROFILE_SQL in quorom/db.py, and applied in
+-- Read by FOCUS_PROFILE_SQL in quorom/db.py. The ICP test is applied in
+-- quorom/weekly/coverage.py; the seniority terms it carries are used by
 -- quorom/weekly/stakeholders.py.
 --
 -- The profile is scoped to the ACCOUNT, not to a user. A per-user profile

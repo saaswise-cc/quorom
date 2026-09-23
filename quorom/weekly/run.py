@@ -186,7 +186,7 @@ def run_weekly(cfg: Config, log=print) -> dict:
         # Step 4 — company coverage (triage). The profile it filters on was
         # read and required at the top of this block.
         log(f"[*] Building company coverage for {len(companies)} companies...")
-        coverage = coverage_mod.build_coverage(cfg, companies, profile, sf, hs, log=log)
+        coverage = coverage_mod.build_coverage(cfg, companies, profile, sf, hs)
 
         # Before the map is chosen: a company whose verdict the provider
         # disputes goes onto the stakeholder list, so this has to have run

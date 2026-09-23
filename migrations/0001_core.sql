@@ -88,14 +88,15 @@ create table attendees (
   meeting_id   uuid not null references meetings(id) on delete cascade,
   account_id   uuid not null references accounts(id) on delete cascade,
 
-  -- Read by: 'Name' on tabs 1 and 2, and the name-only gap rows. Nullable on
+  -- Read by: 'Name' on tab 1, and the name-only gap rows. Nullable on
   -- purpose — an attendee with no name is a gap to report, not a row to drop.
   name         text,
   -- Read by: every reconciliation lookup (Salesforce and HubSpot are both
   -- queried by email) and the join key of MET_HISTORY_SQL. Lowercased at read
   -- time by the pipeline, not stored normalised.
   email        text,
-  -- Read by: company grouping (tab 3 and tab 4 are keyed on domain) and the
+  -- Read by: company grouping (company coverage and the stakeholder list are
+  -- keyed on domain) and the
   -- Salesforce/HubSpot domain queries.
   domain       text,
   -- Read by: the external-attendee filter that both SQL queries open with.

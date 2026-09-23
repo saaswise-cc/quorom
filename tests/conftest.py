@@ -3,10 +3,9 @@
 The CRM and provider legs a test cannot reach are left
 unconfigured on purpose, so the run has to produce an artifact with stated gaps
 rather than silently missing columns. That is the behaviour worth testing; the
-CRM legs are verified against the live systems on the machine that can reach
-them.
+CRM legs themselves are verified by hand against the live systems.
 
-That absence is now enforced rather than assumed — see no_developer_credentials
+The absence is enforced rather than assumed — see `no_developer_credentials`
 below.
 
 Set QUOROM_TEST_DSN to a Postgres a test may create databases on. Without it the

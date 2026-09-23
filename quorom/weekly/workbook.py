@@ -56,11 +56,8 @@ def _linkedin_cell(value) -> str:
 
 def _mobile_cell(value) -> str:
     """A plain yes/no about what the CRM holds, plus "not checked" when no CRM
-    was asked at all.
-
-    This used to read "GAP", in red. The column is a fact about a contact
-    record, not a defect in one, and a page of red against rows where nothing
-    was wrong made the whole artifact read as broken.
+    was asked at all. Not an emphasised gap: a missing mobile number is a fact
+    about a contact record, not a defect in one.
     """
     if value == NOT_CHECKED:
         return NOT_CHECKED
@@ -71,16 +68,11 @@ def _checked_against(cfg: Config) -> str:
     """Met this week's caption line naming the one CRM it was checked against,
     or "".
 
-    This used to be a Source column on the old Missing-from-CRM tab, holding the
-    same value on every row under the header that means "where this person came
-    from" — so a tab of people not in Salesforce read "salesforce" beside each
-    of them. A run-wide fact is stated once, in the caption, the way the
-    coverage tab states its ICP test.
-
-    With both CRMs configured the "In …?" columns already say it per row, and
-    with none there is nothing to explain. The names are the vendors' own,
-    which is fine in a line that reports provenance — what is not fine is
-    naming one that was not consulted.
+    A run-wide fact belongs in the caption rather than in a column repeating it
+    on every row. With both CRMs configured the "In …?" columns already say it
+    per row, and with none there is nothing to explain. Naming the vendor is
+    right in a line that reports provenance; naming one that was not consulted
+    is not.
     """
     names = []
     if cfg.hubspot.configured:
@@ -105,11 +97,9 @@ def _band(profile: dict) -> str:
 def _profile_sentence(profile: dict, geo_label: str) -> str:
     """The ICP test in the reader's words, using their own numbers.
 
-    This used to read "the employee band and HQ geography from your focus
-    profile", which names a concept the reader of the file has never heard of
-    and then declines to say what it contains. The run holds the values; a
-    reader looking at a column of yes and no needs to know what the test was,
-    and nothing else on the page tells them.
+    A reader looking at a column of yes and no needs to know what the test was,
+    and nothing else on the page tells them — so it states the values rather
+    than naming the profile they came from.
     """
     return f"Meets profile? = {_band(profile)}, HQ in {geo_label}."
 
@@ -140,11 +130,11 @@ def build_workbook(
     # Summary — first, unnumbered: it is not a list to work through but the
     # counts of the tabs that are. Built by weekly/summary.py.
     if summary is not None:
-        ws0 = _sheet(wb, "Summary", ["Tab", "What", "Count", "Out of"])
+        ws_summary = _sheet(wb, "Summary", ["Tab", "What", "Count", "Out of"])
         for st in summary:
-            ws0.append([st["area"], st["what"], st["count"], st["out_of"]])
-        ws0.append([])
-        ws0.append(
+            ws_summary.append([st["area"], st["what"], st["count"], st["out_of"]])
+        ws_summary.append([])
+        ws_summary.append(
             [
                 "Each count is a count of rows on the tab named, so any of them can be "
                 "checked there. The one exception is recent contact, which reads every "
@@ -155,10 +145,8 @@ def build_workbook(
     # Tab 1 — Met this week: everyone met, one row per person, and whether each
     # is in the CRM.
     #
-    # This used to be two tabs — everyone met, and a second tab of those not in
-    # the CRM — so a reader compared two lists to find the people to add, and
-    # the second was a filtered copy of the first. One list, with the people
-    # not in the CRM sorted to the top, says the same thing once.
+    # One list rather than two: the people not in the CRM sort to the top, which
+    # is what a second tab of them used to be for.
     #
     # The in-CRM column follows the cross-CRM rule: with both CRMs configured it
     # is the pair "In HubSpot?" / "In Salesforce?" — "in HubSpot but not
@@ -173,7 +161,7 @@ def build_workbook(
     sf_on = cfg.salesforce.configured
     both_crms = hs_on and sf_on
     crm_on = sf_on or hs_on
-    ws1 = _sheet(
+    ws_met = _sheet(
         wb,
         "1 - Met this week",
         ["Name", "Email", "Company (domain)"]
@@ -208,7 +196,7 @@ def build_workbook(
             # provider is set beside it.
             row += [r.get("other_name", ""), r.get("other_title", ""),
                     r.get("other_linkedin", "")]
-        ws1.append(row + [r.get("flag", ""), "gong"])
+        ws_met.append(row + [r.get("flag", ""), "gong"])
     notes = []
     checked = _checked_against(cfg)
     if checked:
@@ -226,9 +214,9 @@ def build_workbook(
             + ", ".join(suppressed)
         )
     if notes:
-        ws1.append([])
+        ws_met.append([])
         for n in notes:
-            ws1.append([n])
+            ws_met.append([n])
 
     # Tab 2 — Company coverage (triage)
     #
@@ -237,7 +225,7 @@ def build_workbook(
     # and summable — writing "not checked" into it would turn the whole column
     # to text and quietly break sorting on the tab whose job is triage — so the
     # absence is expressed by dropping the column rather than by a value in it.
-    ws3 = _sheet(
+    ws_coverage = _sheet(
         wb,
         "2 - Company coverage",
         ["Company", "Company name", "Employees", "HQ", "Account type",
@@ -260,9 +248,9 @@ def build_workbook(
             row.append(c.get("hs_total", 0))
         if other:
             row += [c.get("other_employees"), c.get("other_hq", ""), c.get("verdict_check", "")]
-        ws3.append(row)
-    ws3.append([])
-    ws3.append(
+        ws_coverage.append(row)
+    ws_coverage.append([])
+    ws_coverage.append(
         [
             _profile_sentence(profile, geo_label)
             + " A company with no employee count on file is excluded rather than"
@@ -271,7 +259,7 @@ def build_workbook(
         ]
     )
     if other:
-        ws3.append(
+        ws_coverage.append(
             [
                 f"The {other} columns are a second opinion, not a correction — {other} can "
                 "be out of date too. Profile check runs the same test on its numbers; "
@@ -281,7 +269,7 @@ def build_workbook(
         )
 
     # Tab 3 — Stakeholder list (the map)
-    ws4 = _sheet(
+    ws_map = _sheet(
         wb,
         "3 - Stakeholder list",
         ["Company", "Name", "Title", "Recent contact?", "LinkedIn", "Mobile in CRM?"]
@@ -295,8 +283,8 @@ def build_workbook(
                r.get("contact", ""), r.get("linkedin", ""), r.get("mobile", "")]
         if other:
             row += [r.get("still_at", ""), r.get("other_title", ""), r.get("other_linkedin", "")]
-        ws4.append(row)
-    ws4.append([])
+        ws_map.append(row)
+    ws_map.append([])
     # How the list is built, in the reader's own values — which companies, which
     # people, how many, in what order. A list of names with no stated rule reads
     # as a recommendation from nowhere. Only what a reader needs: design
@@ -306,7 +294,7 @@ def build_workbook(
         also.append("any whose profile fit is disputed")
     if any(not c.get("assessed", True) for c in coverage):
         also.append("any that could not be assessed")
-    ws4.append(
+    ws_map.append(
         [
             f"Companies met this week that meet your profile ({_band(profile)}, HQ in "
             f"{geo_label})"
@@ -317,14 +305,14 @@ def build_workbook(
             "this week."
         ]
     )
-    ws4.append(
+    ws_map.append(
         [
             f"Recent contact = a meeting, or activity logged in the CRM, in the last "
             f"{cfg.recent_days} days. Titles come from the CRM and may be out of date."
         ]
     )
     if other:
-        ws4.append(
+        ws_map.append(
             [
                 f"Still at company? is {other}'s view of where each person works now. "
                 f"The {other} title and LinkedIn are filled only where they differ from "
@@ -335,15 +323,15 @@ def build_workbook(
     # Tab 4 — Review queue. Only with a provider: it holds the disagreements
     # between the CRM and that provider, and there are none to hold without one.
     if other:
-        ws5 = _sheet(
+        ws_queue = _sheet(
             wb,
             "4 - Review queue",
             ["What", "Company", "Person", "CRM says", f"{other} says", "Check"],
         )
         for q in queue or []:
-            ws5.append([q["kind"], q["company"], q["who"], q["crm"], q["other"], q["check"]])
-        ws5.append([])
-        ws5.append(
+            ws_queue.append([q["kind"], q["company"], q["who"], q["crm"], q["other"], q["check"]])
+        ws_queue.append([])
+        ws_queue.append(
             [
                 "Things for a person to settle, most consequential first. Nothing here "
                 "has been changed anywhere — the CRM is updated by whoever works "

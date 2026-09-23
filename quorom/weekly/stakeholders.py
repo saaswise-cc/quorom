@@ -22,7 +22,6 @@ from typing import Optional
 from ..config import Config
 from ..crm.fieldmap import NOT_AVAILABLE
 from ..crm.salesforce import Salesforce
-from .coverage import seniority_terms  # noqa: F401  (re-exported for callers)
 
 # Order matters: the VP test runs before the C-level test so "Vice President"
 # never matches on the word 'president'.
@@ -33,11 +32,8 @@ _DIRECTOR = re.compile(r"\b(director|head\s+of)\b", re.I)
 
 
 def seniority_rank(title: Optional[str]) -> int:
-    """3 C-level, 2 VP, 1 everything else. ORDERING ONLY.
-
-    This used to return an outreach tier (connect / request meeting). That was
-    removed 2026-08-24 — see the module docstring.
-    """
+    """3 C-level, 2 VP, 1 everything else. ORDERING ONLY — no outreach action is
+    implied; see the module docstring."""
     t = (title or "").strip()
     if not t:
         return 0

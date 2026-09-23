@@ -97,7 +97,7 @@ def cmd_init(args, cfg: Config) -> int:
         f"[✓] Focus profile v{result.profile_version} {result.profile} · "
         f"{bootstrap.describe(profile)}"
     )
-    _report_field_map(fields, cfg)
+    _report_field_map(fields)
 
     # Warnings belong on stderr, but a report a human reads has to stay in
     # order when the two streams are captured to one file.
@@ -130,7 +130,7 @@ def _resolve_into(conn, account_id: str, cfg: Config, force: bool = False):
     return bootstrap.install_field_map(conn, account_id, field_map, provenance)
 
 
-def _report_field_map(fields, cfg: Config) -> None:
+def _report_field_map(fields) -> None:
     if isinstance(fields, str):
         print(f"[i] {fields}")
         return
@@ -172,7 +172,7 @@ def cmd_resolve_fields(args, cfg: Config) -> int:
     if isinstance(fields, str):
         print(f"[!] {fields}", file=sys.stderr)
         return 2
-    _report_field_map(fields, cfg)
+    _report_field_map(fields)
     for line in _provenance_lines(fields.provenance):
         print(f"      {line}")
     return 0

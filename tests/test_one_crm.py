@@ -148,7 +148,7 @@ def _run(tmp_path, sf_on: bool, hs_on: bool):
     companies = people_mod.group_companies(people)
     reconciled = [people_mod.reconcile(p, sf, hs) for p in people]
     coverage = coverage_mod.build_coverage(
-        cfg, companies, PROFILE, sf, hs, log=lambda *_: None
+        cfg, companies, PROFILE, sf, hs
     )
     terms = coverage_mod.seniority_terms(PROFILE)
     stakeholders, _ = stakeholders_mod.build(cfg, coverage, terms, {}, sf)

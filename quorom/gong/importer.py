@@ -59,7 +59,12 @@ class ImportResult:
             f"{self.calls_seen} calls in range · {self.meetings_upserted} meetings "
             f"upserted · {self.attendees_created} attendees · {self.people_created} "
             f"new people · {self.calls_already_imported} calls already imported · "
-            f"{format_elapsed(self.elapsed_seconds)} elapsed"
+            + (
+                f"{self.calls_without_parties} with no attendees · "
+                if self.calls_without_parties
+                else ""
+            )
+            + f"{format_elapsed(self.elapsed_seconds)} elapsed"
         )
 
 

@@ -195,12 +195,7 @@ def prose_label(selections: list[dict]) -> str:
     reason to know the shorthand — and a caption that needs decoding is the
     thing that caption exists to stop.
     """
-    parts = []
-    for sel in selections:
-        if sel["level"] == "region":
-            parts.append(sel["value"].title())
-        else:
-            parts.append(sel["value"].title())
+    parts = [sel["value"].title() for sel in selections]
     if not parts:
         return "anywhere"
     if len(parts) == 1:

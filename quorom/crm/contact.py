@@ -1,14 +1,9 @@
 """One person, as the pipeline reads them — whatever CRM they came from.
 
-The field map made Salesforce's *custom* field names portable and left
-the *standard* ones hardcoded one module further out: `weekly/people.py` read
-`Title` and `MobilePhone`, `weekly/stakeholders.py` read `Name`, `Email` and
-`LastActivityDate`. So `crm/salesforce.py` genuinely contained no `__c` and the
-test asserting that was honest, while a second CRM would still have broken every
-caller.
-
-This is the other half. An adapter hands back `Contact`, and nothing under
-`weekly/` knows what any CRM calls anything.
+The field map makes a CRM's *custom* field names portable; this is the other
+half, for the *standard* ones. An adapter hands back a `Contact`, so nothing
+under `weekly/` knows what any CRM calls anything — which is what lets a second
+CRM be added without touching a caller.
 
 Six fields, each one read by a column:
 

@@ -53,7 +53,7 @@ def _seed_profile(dsn: str, account_id: str) -> None:
         )
 
 
-def _import(dsn: str, account_id: str, gong_calls, database_conn=None):
+def _import(dsn: str, account_id: str, gong_calls):
     from tests.conftest import FakeGong
 
     with psycopg.connect(dsn) as conn:
@@ -718,7 +718,8 @@ def test_workbook_columns_follow_the_crms_configured(
         geo_label="United States/Canada",
     )
     wb = load_workbook(out)
-    assert "2 - Missing from CRM" not in wb.sheetnames
+    # One list of people, not two: everyone met, in-CRM column and all.
+    assert wb.sheetnames[0] == "1 - Met this week"
 
     ws1 = wb["1 - Met this week"]
     assert _headers(ws1) == (
@@ -815,24 +816,19 @@ def test_no_crm_does_not_silently_empty_the_stakeholder_map(
 
     # Tab 3 — not empty. Every company that reached the map is on it, saying
     # why there are no people rather than being absent.
-    tab4 = [
+    stakeholder_rows = [
         r for r in wb["3 - Stakeholder list"].iter_rows(min_row=2, values_only=True)
         if r[1]
     ]
-    assert tab4, "tab 3 must not be empty when the ICP test could not run"
-    assert {r[1] for r in tab4} == {ICP_NOT_ASSESSED}
-    assert {r[0] for r in tab4} == {"acme.com"}
+    assert stakeholder_rows, "tab 3 must not be empty when the ICP test could not run"
+    assert {r[1] for r in stakeholder_rows} == {ICP_NOT_ASSESSED}
+    assert {r[0] for r in stakeholder_rows} == {"acme.com"}
     # Not the "we looked and found nobody" row — nothing was looked at.
-    assert all(r[1] != NO_SENIOR_CONTACT for r in tab4)
+    assert all(r[1] != NO_SENIOR_CONTACT for r in stakeholder_rows)
 
-    # Tab 1 — the header no longer names a CRM this run never called.
-    #
-    # An earlier fix renamed this column "Title (SF)" → "Title (CRM)" and
-    # asserted the renamed column was present. This goes further: with no CRM
-    # configured the title was empty on every row anyway, so the column is
-    # dropped rather than renamed — the same answer tab 2 gives. The
-    # "(SF)" assertion is what mattered and it still holds — a header naming an
-    # uncalled system is the defect, and no header can name one now.
+    # Tab 1 — no header names a system this run never called, and a column
+    # whose source was not configured is dropped rather than renamed: with no
+    # CRM the title is empty on every row, so there is nothing to head.
     assert "Title (SF)" not in _headers(wb["1 - Met this week"])
     assert "Title (CRM)" not in _headers(wb["1 - Met this week"])
 

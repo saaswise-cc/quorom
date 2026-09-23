@@ -142,7 +142,6 @@ def build_coverage(
     profile: dict,
     sf: Salesforce,
     hs: HubSpot,
-    log=print,
 ) -> list[dict]:
     terms = seniority_terms(profile)
     coverage: list[dict] = []
