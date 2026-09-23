@@ -18,9 +18,12 @@ from __future__ import annotations
 import os
 import pathlib
 import uuid
+from types import SimpleNamespace
 
 import psycopg
 import pytest
+
+from quorom.config import SalesforceConfig
 
 MIGRATIONS = sorted(
     (pathlib.Path(__file__).resolve().parents[1] / "migrations").glob("0*.sql")
@@ -29,8 +32,29 @@ MIGRATIONS = sorted(
 
 # The CRM legs this suite requires to be absent. SF_ is a prefix rather than a
 # list so a new Salesforce variable cannot quietly reintroduce the problem.
-CREDENTIAL_VARS = ("HUBSPOT_SERVICE_KEY",)
-CREDENTIAL_PREFIXES = ("SF_",)
+# DATABASE_URL and the Gong pair are here for a second reason: a test that
+# builds a configuration object picks up whatever the developer's .env holds for
+# anything it does not set, and a failing assertion prints that object. Clearing
+# them means a traceback has nothing live to print.
+CREDENTIAL_VARS = ("HUBSPOT_SERVICE_KEY", "DATABASE_URL")
+CREDENTIAL_PREFIXES = ("SF_", "GONG_")
+
+
+def crm_config(configured: bool = True):
+    """A configuration stub for the CRM adapters — never a real `Config`.
+
+    A real one reads the environment for every field a test does not set, so a
+    failing assertion can put a live credential in a traceback. The adapters
+    read one attribute each, so a namespace is enough, and every Salesforce
+    field is given explicitly rather than defaulted from the environment.
+    """
+    return SimpleNamespace(
+        salesforce=SalesforceConfig(
+            access_token="t" if configured else "",
+            instance_url="https://x" if configured else "",
+            token_url="", client_id="", client_secret="",
+        ),
+    )
 
 
 @pytest.fixture(autouse=True)

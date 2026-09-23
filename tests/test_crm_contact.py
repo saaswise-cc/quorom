@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import pathlib
 import re
+from types import SimpleNamespace
 
 import pytest
 
-from quorom.config import Config, HubSpotConfig, SalesforceConfig
+from quorom.config import HubSpotConfig
+from tests.conftest import crm_config as _crm_cfg
 from quorom.crm.contact import Contact
 from quorom.crm.fieldmap import NOT_AVAILABLE, FieldMap
 from quorom.crm.hubspot import HubSpot
@@ -46,17 +48,13 @@ HS_RECORD = {
 
 
 def _sf(linkedin: bool = True) -> Salesforce:
-    cfg = Config(
-        database_url="postgresql:///x", account="northwind.com",
-        salesforce=SalesforceConfig(access_token="t", instance_url="https://x"),
-    )
-    return Salesforce(cfg, FieldMap(
+    return Salesforce(_crm_cfg(), FieldMap(
         {"Contact": {"linkedin_url": ["Pkg__Linkedin__c"] if linkedin else []}}
     ))
 
 
 def _hs() -> HubSpot:
-    return HubSpot(Config(hubspot=HubSpotConfig(api_key="k")))
+    return HubSpot(SimpleNamespace(hubspot=HubSpotConfig(api_key="k")))
 
 
 # --- Salesforce ------------------------------------------------------------- #
@@ -257,7 +255,7 @@ def test_the_stakeholder_row_is_built_from_the_contact(tmp_path):
                         email="sam@acme.com", linkedin=None),
             ]
 
-    cfg = Config(database_url="postgresql:///x", account="northwind.com", shortlist_size=3)
+    cfg = SimpleNamespace(recent_days=90, group_call_min=8, shortlist_size=3)
     rows, raw = build(
         cfg, [{"domain": "acme.com", "name": "Acme", "is_target": True, "met": 1}],
         ["VP"], {}, _Bench(),

@@ -12,12 +12,13 @@ list is not committed here: the repository holds patterns, never names.
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import psycopg
 import pytest
 
 from quorom import bootstrap, db
-from quorom.config import Config, SalesforceConfig
+from quorom.config import SalesforceConfig
 from quorom.crm.fieldmap import (
     NOT_AVAILABLE,
     SPECS,
@@ -31,6 +32,7 @@ from quorom.crm.contact import Contact
 from quorom.crm.salesforce import Salesforce
 from quorom.weekly.run import MissingFieldMap, run_weekly
 
+from tests.conftest import crm_config as _crm_cfg
 from tests.test_import_and_weekly import ACCOUNT, _cfg, _import
 
 
@@ -284,11 +286,7 @@ def test_an_empty_map_still_produces_a_valid_query():
 
 def test_salesforce_queries_are_built_from_the_map():
     """The whole point: not one non-standard API name is written in the code."""
-    cfg = Config(
-        database_url="postgresql:///x", account=ACCOUNT,
-        salesforce=SalesforceConfig(access_token="t", instance_url="https://x"),
-    )
-    sf = Salesforce(cfg, FieldMap({
+    sf = Salesforce(_crm_cfg(), FieldMap({
         "Account": {"employee_count": ["Pkg__E__c"], "hq_country": ["Pkg__C__c"]},
         "Contact": {"linkedin_url": ["Pkg__L__c"]},
     }))
@@ -317,11 +315,7 @@ def test_the_salesforce_module_names_no_custom_field():
 
 
 def test_firmographics_returns_the_parts_as_well_as_the_display_string():
-    cfg = Config(
-        database_url="postgresql:///x", account=ACCOUNT,
-        salesforce=SalesforceConfig(access_token="t", instance_url="https://x"),
-    )
-    sf = Salesforce(cfg, FieldMap({"Account": {
+    sf = Salesforce(_crm_cfg(), FieldMap({"Account": {
         "employee_count": ["N__c"], "hq_city": ["City__c"],
         "hq_state": ["State__c"], "hq_country": ["Country__c"],
     }}))
@@ -343,15 +337,9 @@ def test_firmographics_returns_the_parts_as_well_as_the_display_string():
 
 
 def _sf(available: bool, configured: bool = True):
-    cfg = Config(
-        database_url="postgresql:///x", account=ACCOUNT,
-        salesforce=(
-            SalesforceConfig(access_token="t", instance_url="https://x")
-            if configured else SalesforceConfig()
-        ),
-    )
     return Salesforce(
-        cfg, FieldMap({"Contact": {"linkedin_url": ["L__c"] if available else []}})
+        _crm_cfg(configured),
+        FieldMap({"Contact": {"linkedin_url": ["L__c"] if available else []}}),
     )
 
 
@@ -408,9 +396,8 @@ def test_a_stored_map_is_read_back_by_the_pipeline(database):
         conn.commit()
 
     assert (result.action, result.version) == ("created", 1)
-    cfg = Config(database_url=database, account=ACCOUNT)
     with psycopg.connect(database) as conn:
-        assert db.crm_field_map(conn, cfg) == field_map
+        assert db.crm_field_map(conn, SimpleNamespace(account=ACCOUNT)) == field_map
 
 
 def test_re_resolving_supersedes_and_keeps_the_old_version(database):
@@ -439,7 +426,11 @@ def test_the_run_refuses_to_start_with_a_crm_and_no_map(database, gong_calls, tm
     _import(database, account_id, gong_calls)
     cfg = _cfg(
         database, tmp_path,
-        salesforce=SalesforceConfig(access_token="t", instance_url="https://x"),
+        # Every field given, so nothing is defaulted from the environment.
+        salesforce=SalesforceConfig(
+            access_token="t", instance_url="https://x",
+            token_url="", client_id="", client_secret="",
+        ),
     )
 
     with pytest.raises(MissingFieldMap, match="resolve-fields"):

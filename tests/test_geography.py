@@ -10,7 +10,6 @@ import psycopg
 import pytest
 
 from quorom import geography
-from quorom.config import Config
 from quorom.weekly.coverage import meets_profile
 from quorom.weekly.run import run_weekly
 
