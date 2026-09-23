@@ -11,8 +11,8 @@
 --   artifact as a wrong 'Recent contact?' value, silently. person_identifiers
 --   is what collapses the aliases back to one person.
 --
---   It is not hypothetical at real scale: on one real org, 2,884 people carry
---   2,196 identifiers and 5,075 attendee links.
+--   It is not hypothetical at real scale: on a real org a substantial share of
+--   people carry more than one identifier.
 --
 -- The honest statement of the debt: MET_HISTORY_SQL does not use these tables
 -- yet — it still groups by email. Making the history query resolve through

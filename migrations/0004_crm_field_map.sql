@@ -43,10 +43,10 @@ create table crm_field_maps (
   --                "hq_country": [...], "hq_city": [...], "hq_state": [...]},
   --    "Contact": {"linkedin_url": [...]}}
   -- A LIST per logical field, best-populated first, not a single name: the
-  -- first populated value wins at read time. Measured on one real org, three
-  -- of thirty-nine companies met in one week have an empty package country and
-  -- a populated BillingCountry, and a single-name map would blank their HQ and
-  -- drop one out of the ICP set.
+  -- first populated value wins at read time. On one real org some companies
+  -- met in a week have an empty package country and a populated
+  -- BillingCountry, and a single-name map would blank their HQ and drop them
+  -- out of the ICP set.
   field_map      jsonb       not null,
 
   -- Read by a human, and by the JSON dump the artifact ships. Per logical

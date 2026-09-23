@@ -51,24 +51,22 @@ else comes from the deployment's resolved field map, so the query runs against
 any Salesforce org whether or not a managed data package is installed. Described
 in `docs/pipeline.md`, step 0b.
 
-**This section is the record of what was dropped and why.** The figures below
-were measured on one real org's bench of roughly 240 contacts — they are from a
-run, not from documentation, and yours will differ.
+**This section is the record of what was dropped and why.** It comes from one
+real org's bench rather than from documentation; yours will differ.
 
 **Sequence-state custom fields** — an email sent through a sequencing tool is
 written back to Salesforce as a Task, and `LastActivityDate` already rolls Tasks
 up, so such a field mostly restates what the pipeline has. Where the two
-disagreed — 37 contacts showing an `active` sequence with no logged activity —
-the sequences were stale, one of them named after a holiday campaign three years
-earlier. The field was wrong, not the rollup. And `emailed` versus `contacted`
+disagreed — contacts showing an `active` sequence with no logged activity —
+the sequences were years stale. The field was wrong, not the rollup. And `emailed` versus `contacted`
 changes nothing a reader would do with the row.
 
 **An org-local LinkedIn field** — selecting it by name made every bench query
-non-portable. In that org it added a URL for 7 contacts beyond the
-managed-package field, which already covered about 85% of the bench. Not worth
-the portability cost for 3%.
+non-portable. In that org it added a URL for a small tail of contacts beyond the
+managed-package field, which already covered most of the bench. Not worth the
+portability cost for the remainder.
 
-**The field map is how that 3% comes back.** The resolver finds both fields,
+**The field map is how that remainder comes back.** The resolver finds both fields,
 ranks the managed-package one first on populated rows and keeps the org-local
 one behind it as the fallback; the first populated value wins at read time.
 Nothing is selected by a name written in this repository, so the portability

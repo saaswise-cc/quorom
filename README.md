@@ -130,10 +130,10 @@ and the standard fields.
 Two things about it were forced by real data rather than designed in advance,
 and both are worth knowing before you read a field-map report:
 
-**It keeps a list per logical field, not a winner.** In one org, three of the
-thirty-nine companies met in a single week had an empty country in the
-best-populated field and a populated one in the next. A map storing only the
-winner would have blanked their HQ and dropped one of them out of the ICP set.
+**It keeps a list per logical field, not a winner.** In one org, several of the
+companies met in a single week had an empty country in the best-populated field
+and a populated one in the next. A map storing only the winner would have
+blanked their HQ and dropped at least one of them out of the ICP set.
 
 **Population alone picks the wrong field.** In the same org, the best-populated
 field matching `/linkedin/` on `Contact` was the *company's* page, beating the

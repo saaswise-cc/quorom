@@ -23,9 +23,9 @@ TIMEOUT = 30
 SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
 
 # Both reads below hit the CRM *search* endpoint, which HubSpot throttles on a
-# short interval rather than against the daily allowance. Measured on one real
-# account: 753 calls used against a daily limit of 1,000,000, and a weekly run
-# makes roughly 130 — so a 429 here is a burst limit, not a quota. HubSpot did
+# short interval rather than against the daily allowance. A weekly run makes
+# far fewer calls than a day's allowance on any plan we have seen, so a 429
+# here is a burst limit rather than a quota. HubSpot did
 # not return the per-interval headers on this endpoint, so the interval is
 # unknown and the retry deliberately does not depend on knowing it.
 #

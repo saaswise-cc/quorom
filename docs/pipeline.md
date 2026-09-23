@@ -282,11 +282,12 @@ the workbook would have its usual shape, and every company met that week would
 be reported as a target; a reader could not tell that from a correct run. The
 profile is read and required at the top of `run_weekly` so the failure costs a
 second rather than every CRM call above it. `quorom init` creates one.
-`Account type` is captured and displayed but is **not** a filter: across the 39
-companies met in the 2026-08-17 week the only values present were
-`Customer - Direct` (31), `Customer Lost` (3), `Freemium User` (4) and one blank,
-and gating on it collapsed 16 ICP-fit companies to 1. The gate stays in the code
-behind `CUSTOMER_ACCOUNT_TYPES`, off by default.
+`Account type` is captured and displayed but is **not** a filter. In one org
+every value present on a week's companies was a customer or lifecycle label, so
+gating on it removed nearly the whole ICP-fit set. `Type` is a per-org picklist
+and commonly not maintained, so the gate stays in the code behind
+`CUSTOMER_ACCOUNT_TYPES`, off by default. A run dumps the values it observed, so
+you can see what yours holds before turning it on.
 
 The firmographics query names no non-standard field: every one comes from the
 resolved map (step 0b), so an org with no managed data package installed reads

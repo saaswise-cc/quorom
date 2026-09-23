@@ -79,8 +79,8 @@ create table meetings (
 );
 
 -- WEEK_ATTENDEES_SQL filters one week by start_time within an account;
--- MET_HISTORY_SQL scans all of an account's meetings (1,942 rows on one
--- real org).
+-- MET_HISTORY_SQL scans all of an account's meetings, which grows without
+-- bound as history is imported.
 create index meetings_account_start_idx on meetings (account_id, start_time);
 
 create table attendees (

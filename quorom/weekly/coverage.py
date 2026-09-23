@@ -127,8 +127,8 @@ def is_customer(cfg: Config, account_type: Optional[str]) -> bool:
     Type is a per-org picklist, so this matches substrings rather than
     hardcoding labels, and a run dumps the values it actually observed before
     the gate is applied. Off by default because Type is commonly not maintained
-    as a lifecycle field: on one real week of 39 companies, gating on it
-    collapsed 16 ICP-fit companies to 1.
+    as a lifecycle field — in one org, gating on it removed nearly the whole
+    ICP-fit set for the week.
     """
     t = (account_type or "").strip().lower()
     if not t or not cfg.customer_account_types:

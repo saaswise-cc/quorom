@@ -165,5 +165,5 @@ venv/
 output/
 
 # Files delivered into this folder by the Claude desktop app.
-# Has held a student-data export; never commit.
+# May contain data from a local machine; never commit.
 Claude outputs/

@@ -14,11 +14,10 @@ count order — into the account's field map. Every query is then built from the
 map.
 
 **Ordered candidates, not a single winner.** The first populated value wins at
-read time. On one real org the reason is concrete: three of the thirty-nine
-companies met in a single week have an empty managed-package country field and
-a populated `BillingCountry`. A map holding
-only the better-populated field would blank their HQ and drop one of them out of
-the ICP set. Ordering decides which field is asked first; the chain is what
+read time. On one real org the reason is concrete: some of the companies met in
+a week have an empty managed-package country field and a populated
+`BillingCountry`. A map holding only the better-populated field would blank
+their HQ and drop them out of the ICP set. Ordering decides which field is asked first; the chain is what
 stops a per-row gap becoming a wrong answer.
 
 **Why counting is not enough on its own.** On the same org the best-populated

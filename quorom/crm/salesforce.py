@@ -274,8 +274,8 @@ class Salesforce:
     def describe_contact(self) -> dict:
         """Zero-cost evidence, kept because it answers a question that recurs:
         does this org track LinkedIn connection STATUS anywhere on Contact, or
-        only the profile URL? On the first org it was run against, across 464
-        fields: URLs only."""
+        only the profile URL? On the org it was first run against, across every
+        field on the object: profile URLs only, no connection status."""
         if not self._auth()[0]:
             return {"checked": False, "reason": "Salesforce not configured"}
         fields = [
