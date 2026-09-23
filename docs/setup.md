@@ -164,7 +164,7 @@ workstation.
 |---|---|---|
 | **PostgreSQL 13 or later**, reachable from both machines | The product database. `gen_random_uuid()` is built in from 13. | Reachability first: `nc -z -w5 <host> <port>`. Then the real thing: `psql "<your connection string>" -c "select version();"` |
 | **Python 3.11 or later** on the workstation | The pipeline is Python. | `python3 --version` |
-| **`psql`** on the workstation | Four SQL files to run | `psql --version` |
+| **`psql`** on the workstation | The migrations to apply | `psql --version` |
 | **Gong API credentials** — an access key and secret, **read-only** | The meeting source. Everything downstream reads meetings imported from here. | Gong admin → API |
 | **Outbound network to `api.gong.io`** from both machines | The overnight job needs it too, not just your workstation | `curl -sI https://api.gong.io` |
 | **Salesforce access** — see section 7 | The CRM half of the map: reconciliation, firmographics, the senior contact bench | `curl -sI https://<your-domain>.my.salesforce.com` — a `401` or a redirect is a pass. You are testing the network path, not the credentials; those come in section 7. |
@@ -964,15 +964,15 @@ reads, its `count`, and `out_of` (null where a count has no denominator). A
 count whose source was not configured is absent, not zero. The same list is in
 the inputs dump under `summary`, which is the copy retention keeps.
 
-The tabs:
+The tabs, named here exactly as the workbook names them:
 
 | Tab | What it answers |
 |---|---|
-| **Summary** | The run in counts, each out of its denominator: companies met and how many fit your profile; of those, how many had someone senior contacted recently; people met, how many are not in your CRM, and how many CRM records lack a title, LinkedIn or mobile; the same gaps on the stakeholder list; and, with a provider, the review queue by kind. Each count is a count of rows on the tab it names |
-| **1 — Met this week** | Who attended from outside, one row per person: whether each is in your CRM, and for those who are, their CRM title, LinkedIn and whether a mobile number is on file. People not in the CRM are listed first, with `—` in the CRM columns — there is no record to read. Attendees with neither email nor domain (meeting bots) are listed at the foot — suppressed visibly, not dropped. |
-| **2 — Company coverage** | Every external company met: size, HQ, whether it meets your profile, how many contacts you hold |
-| **3 — Stakeholder list** | The map. The senior people in your CRM at the ICP-fit companies worth considering, capped at `SHORTLIST_SIZE` each. Its caption states the rule in your profile's terms |
-| **4 — Review queue** | Only with an enrichment provider configured: where your CRM and the provider disagree, for a person to settle. Its `Company` column is the CRM account's name, falling back to the domain only where no account matched — the other tabs key on the domain, so a script filtering this one by domain will miss rows. The provider's values also appear beside the CRM's on tabs 1, 2 and 3 — `docs/enrichment.md` |
+| **`Summary`** | The run in counts, each out of its denominator: companies met and how many fit your profile; of those, how many had someone senior contacted recently; people met, how many are not in your CRM, and how many CRM records lack a title, LinkedIn or mobile; the same gaps on the stakeholder list; and, with a provider, the review queue by kind. Each count is a count of rows on the tab it names |
+| **`1 - Met this week`** | Who attended from outside, one row per person: whether each is in your CRM, and for those who are, their CRM title, LinkedIn and whether a mobile number is on file. People not in the CRM are listed first, with `—` in the CRM columns — there is no record to read. Attendees with neither email nor domain (meeting bots) are listed at the foot — suppressed visibly, not dropped. |
+| **`2 - Company coverage`** | Every external company met: size, HQ, whether it meets your profile, how many contacts you hold |
+| **`3 - Stakeholder list`** | The map. The senior people in your CRM at the ICP-fit companies worth considering, capped at `SHORTLIST_SIZE` each. Its caption states the rule in your profile's terms |
+| **`4 - Review queue`** | Only with an enrichment provider configured: where your CRM and the provider disagree, for a person to settle. Its `Company` column is the CRM account's name, falling back to the domain only where no account matched — the other tabs key on the domain, so a script filtering this one by domain will miss rows. The provider's values also appear beside the CRM's on tabs 1, 2 and 3 — `docs/enrichment.md` |
 
 **`docs/reading-your-first-run.md` is what to send to whoever receives this
 file.** It covers what to check first to know the run worked, what looks
@@ -1305,8 +1305,8 @@ that never appears. Check what your deployment is pinned to before concluding
 anything is broken. One real deployment spent a debugging session on a manifest
 file that had landed upstream a week after the commit it was pinned to.
 
-If a new migration is added it will be `0005_` or later; apply the ones you have
-not applied, in filename order.
+A new migration is numbered above the highest one you have applied; apply the
+ones you have not, in filename order.
 
 Re-run `quorom resolve-fields` when your Salesforce admin adds a field, installs
 or removes a package, or when a column in the artifact stops looking right. The

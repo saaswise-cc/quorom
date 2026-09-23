@@ -17,7 +17,8 @@ start without — the account, its active focus profile, and the resolved CRM
 field map — and is the next step after the files above (`docs/pipeline.md`,
 steps 0a and 0b).
 
-Verified 2026-08-24 on PostgreSQL 16.13: all four apply clean from empty, and
+Verified 2026-08-24 on PostgreSQL 16.13: all four of the files above apply
+clean from empty, and
 the three queries the pipeline makes — `MEETINGS_SQL`, `MET_HISTORY_SQL` and the
 active-focus-profile select — run verbatim against the result.
 
@@ -40,7 +41,8 @@ already satisfied by real rows.
 
 ## Shape
 
-Eight tables. Five are read by the artifact, three are written by the importer
+Eight tables, plus `run_outputs` if you apply the optional migration below.
+Five are read by the artifact, three are written by the importer
 and not yet read — a deliberate, documented exception in `0002_identity.sql`,
 not an oversight.
 

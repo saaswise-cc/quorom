@@ -20,8 +20,9 @@ which legs actually ran.
    is empty, the week window found no meetings — check the window before
    concluding anything about the data.
 2. **Does tab 2 have employee counts and HQs?** If those columns are populated,
-   your CRM leg ran. If `Meets profile` is blank on every row, it did not, and
-   nothing on tab 3 means what it looks like it means.
+   your CRM leg ran. If `Meets profile?` reads `not assessed — no CRM
+   configured` on every row, it did not, and nothing on tab 3 means what it
+   looks like it means.
 3. **Does tab 3 have people on it?** If it carries a single explanatory row
    instead, no company passed the filter. That is a real answer sometimes — but
    check point 2 first, because an unassessed company cannot pass a filter it
@@ -33,10 +34,22 @@ CRM" count without a CRM — which is different from a line reading 0. Every
 count is out of something; read the two together. Each is a count of rows on
 the tab it names, so a number that looks wrong can be checked there.
 
-Blank and false are different everywhere in this output. **Blank means the test
-did not run. False means it ran and the answer was no.** A column of blanks is
-a configuration fact about your deployment; a column of falses is a finding
-about your data.
+**An absent column, a `—`, and a `no` mean three different things**, and the
+difference is the same one everywhere in this output:
+
+- **A column that is not there at all** is a source your deployment did not
+  configure. The run reports nothing about a system it never asked, rather than
+  reporting a 0 or a blank that reads like an answer. This is a fact about your
+  configuration, not about your data.
+- **`—`, or `not assessed — no CRM configured`,** means the question was asked
+  and there was nothing to read: no CRM record for that person, no
+  firmographics to test that company against.
+- **`no`** means the run looked and the answer was no. Only this one is a
+  finding. An empty `LinkedIn?` cell says the same thing more quietly: your CRM
+  has the field, and this person has nothing in it.
+
+So a column you expected and cannot find is a configuration problem, and a
+column full of `no` is something to act on.
 
 ## What looks alarming and is not
 

@@ -15,7 +15,7 @@ company record, then identify the other stakeholders at that company who should
 be part of a collective engagement.
 
 **The output is a stakeholder map for one target company at a time**, produced
-weekly, as a spreadsheet.
+weekly, as a workbook and a single-page view of the same data.
 
 Without this exercise, company-to-company engagement doesn't start at all. That
 is the value proposition — not better insight, not richer briefs. Coverage, and
@@ -26,7 +26,8 @@ a list of names worth considering.
 Briefs. Deliverables. Focus scoring. Outbound sequencing. Transcript moments.
 Any web UI. Writing back to any CRM.
 
-The read surface is one file. It is deliberately one file.
+There is one thing to read, and that is deliberate: a workbook, and the same
+data as one page for anyone without a spreadsheet open.
 
 ---
 
@@ -212,6 +213,7 @@ docs/setup.md                   how to stand a deployment up — start here
 docs/supported-configuration.md what is and is not supported today
 docs/pipeline.md                the six steps, and the read path each serves
 docs/reading-your-first-run.md  what to make of the output — send this to its reader
+docs/enrichment.md              the optional enrichment provider, and what it costs
 docs/salesforce-access.md       the two Salesforce auth modes
 docs/paas-deployment.md         worked example: running the schedule on a PaaS
 docs/slack-delivery.md          worked example: delivering a run to Slack

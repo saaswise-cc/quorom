@@ -260,7 +260,8 @@ count and one `AccountId`; SF `Account` firmographics — the standard
 **Cost:** none.
 
 **Read path served:** every column of **tab 2 (Company coverage)** —
-`Company name`, `Employees`, `HQ`, `Account type`, `Meets profile?`,
+`Company` (the domain met), `Company name`, `Employees`, `HQ`, `Account type`,
+`Meets profile?`,
 `Met this wk`, `SF contacts`, `SF focus-senior`, `HubSpot contacts` — and the
 ICP filter that decides which companies reach tab 3. The three count columns
 appear only for a CRM that was configured: a count of contacts nobody counted
@@ -392,9 +393,11 @@ another source.
 
 ## Step 6 — Emit
 
-**Writes:** a local `.xlsx` (a Summary tab and three numbered tabs; a fourth,
-the review queue, with an enrichment provider), `summary_<week>.json` with the
-Summary tab's counts, and a JSON dump of every input — focus
+**Writes:** five files, and nothing anywhere else — a local `.xlsx` (a Summary
+tab and three numbered tabs; a fourth, the review queue, with an enrichment
+provider), `weekly_view_<week>.html` rendered from it, `summary_<week>.json`
+with the Summary tab's counts, `last_run.json` naming all of them, and a JSON
+dump of every input — focus
 profile, seniority terms, observed `Account.Type` values, coverage, meeting
 history, the SF bench, the shortlist, the `Contact` describe, and with a
 provider its values on each coverage and shortlist row, its name, and the
