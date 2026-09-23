@@ -248,86 +248,59 @@ House rules for this project:
   secret lives; never its value.
 ```
 
-**Move this conversation into the project now.** Not "at some point", not when
-it next comes up — immediately, before you read the next section. Everything
-after this assumes the agent working alongside you has these instructions
-loaded, and a conversation started outside the project does not get them no
-matter how good the instructions are. This is the single easiest step in the
-guide to nod at and skip, and skipping it makes the text you just wrote inert
-for the session that wrote it.
+**Move this conversation into the project now**, before the next section: a
+conversation started outside the project never gets those instructions, however
+good they are. Then add anyone else who will touch this deployment — at minimum
+whoever administers your infrastructure, who owns the decision in section 13 and
+may be needed in section 7.
 
-**Then add anyone else who will touch this deployment.** At minimum whoever
-administers your infrastructure — section 13 is their decision, and section 7
-may need them too. Anyone you will have to ask for access should be able to see
-why, without you relaying it.
+**`<YOUR REPO URL>` does not exist yet, and that is fine.** You create it in
+step 2; fill the placeholder in then. Everything else in the template you can
+fill in now.
 
-> **`<YOUR REPO URL>` does not exist yet, and that is fine.** You create that
-> repository in step 2. Leave the placeholder alone for now and fill it in when
-> you have the address. Nothing in this step waits on it, and the agent is
-> useful without it — the line that matters here is the upstream one. Everything
-> else in the template you can fill in immediately.
+**Pointing the project at this repository is just the URL** — it is public.
+Nothing to authorise, install or configure. If you are hunting for a settings
+screen, there isn't one.
 
-**Pointing the project at this repository is just the URL.** It is a public
-repository on GitHub. There is no connector to authorise, no token to issue, no
-integration to install, no permission to grant and no setting to go and find.
-The address in the instructions above is the whole mechanism: an agent can read
-the code, the migrations and these docs from it directly. If you are hunting for
-a configuration screen, stop — there isn't one.
-
-**Do not upload files from this repository into the project as knowledge
-documents.** It is a tempting shortcut and it goes wrong quietly. An uploaded
-file is a copy, frozen at the moment you uploaded it. The first time upstream
-changes, your copy is silently wrong, and from then on everyone in the project
-is following a stale document in good faith — with no diff, no warning and no
-merge path back. That is the fork problem of section 1 in a different costume:
-same drift, same silence, same dead end. The project *references* the
-repository; it never *contains* it. When you need the current text of a file,
-have the agent read it at the URL.
+**Do not upload files from this repository into the project.** An uploaded file
+is a copy frozen at the moment you uploaded it, so the first time upstream
+changes everyone is following a stale document in good faith, with no diff and
+no merge path back. That is section 1's fork problem in a different costume. The
+project references the repository; it never contains it.
 
 ### Secrets do not go into the conversation
 
 You are about to be handed credentials — a database connection string, a Gong
-Access Key Secret, a Salesforce client secret, perhaps a HubSpot key. This is
-the rule for all of them, and it is here rather than further down because by
-section 7 it would already be too late.
+Access Key Secret, a Salesforce client secret, perhaps a HubSpot key. The rule
+is here rather than further down because by section 7 it would already be too
+late.
 
-- **Never paste a secret into the chat.** Not a connection string, not a token,
-  not a client secret, not an API key, not "just so you can check the format".
-  A conversation is stored and searchable; it is not a secret store.
-- **Run the commands that touch a credential yourself**, in your own terminal,
-  and report back the result rather than the input: "connected", "eight
-  tables", "401 on the second call". The agent needs the outcome. It never
-  needs the value.
-- **A secret shown once goes straight to your secret store** — not into a note,
-  not into a message you intend to delete later. Gong's Access Key Secret is
-  the case that bites (section 3): displayed at creation, never again.
+- **Never paste one into the chat** — not a connection string, not a token, not
+  "just so you can check the format". A conversation is stored and searchable.
+- **Run the commands that touch a credential yourself** and report the outcome
+  rather than the input: "connected", "eight tables", "401 on the second call".
+- **A secret shown once goes straight to your secret store.** Gong's Access Key
+  Secret is the case that bites (section 3): displayed at creation, never again.
 - **Project instructions and tracker issues name where a secret lives, never
-  what it is.** "Database credentials: our secret store, key
-  `QUOROM_DATABASE_URL`" is the right shape. Those texts are permanent and
-  visible to everyone in the workspace, which is exactly what a credential
-  must not be.
-- **If one does land somewhere it shouldn't, rotate it.** Deleting the message
-  is not a rotation.
+  what it is** — "our secret store, key `QUOROM_DATABASE_URL`". Those texts are
+  permanent and visible to everyone in the workspace.
+- **If one lands somewhere it shouldn't, rotate it.** Deleting the message is
+  not a rotation.
 
-The same care applies to output, not just input: a traceback or a log line can
-carry a connection string inside it. Read what you are about to paste. Section
-15 has the case that catches people — a failing test that builds a real config.
+Output carries them too: a traceback or a log line can hold a connection string.
+Read what you are about to paste.
 
 ### Reading it and running it are different things
-
-The guide asks you to do both, and they are easy to conflate. They need
-completely different things:
 
 | Activity | What it needs |
 |---|---|
 | **Reading** — how does this behave, what does that flag do, what does `0002` create, why is it shaped this way | The URL. Nothing else. No clone, no credentials, no database. |
 | **Executing** — applying the migrations, `quorom init`, `quorom import`, `quorom weekly` | A clone on the workstation of section 3 — a machine that can reach your database, Gong and Salesforce. That is step 5, in section 8. |
 
-Asking an agent what `RECENT_DAYS` does, or what a column on tab 3 means, needs
-nothing but the address — no setup, no access, and you can do it right now.
-Running the weekly job needs a machine, a database, a virtualenv and real
-credentials, and the agent in your Claude project is not on that machine unless
-you have put it there yourself.
+Asking what `RECENT_DAYS` does needs nothing but the address, and you can do it
+right now. Running the weekly job needs a machine, a database, a virtualenv and
+real credentials — and the agent in your Claude project is not on that machine
+unless you have put it there.
 
 Add the Linear MCP if your team uses it, so the agent can read the project
 below. Nothing in the pipeline requires it.
@@ -581,18 +554,10 @@ The pipeline wants a database of its own. Making one is two moves: get an admin
 connection to your PostgreSQL instance, then `CREATE DATABASE`.
 
 **Find the admin connection string, and tell it apart from an app-scoped one.**
-A platform that manages Postgres for you typically shows several connection
-strings for the same instance, and they are not interchangeable. Two
-distinctions matter:
-
-- **Internal versus public hostname.** Hosting platforms usually offer an
-  internal or private hostname that only resolves inside their own network,
-  alongside a public or external one. From your workstation the internal one
-  does not resolve at all. Use the public one here.
-- **Admin versus app-scoped credential.** A string scoped to one existing
-  database, often with a user of its own, is not the same as the admin or
-  superuser credential for the whole instance. Creating a database needs the
-  second.
+A managed Postgres typically shows several strings for the same instance, and
+they are not interchangeable. Take the **public** hostname, not the internal one
+that resolves only inside the platform's network, and the **admin** credential
+for the instance rather than one scoped to an existing database.
 
 Then create it:
 
@@ -601,27 +566,19 @@ export ADMIN_DATABASE_URL="<paste the admin connection string here>"
 psql "$ADMIN_DATABASE_URL" -c "CREATE DATABASE quorom;"
 ```
 
-Delete the angle brackets along with the words inside them (section 3). Run
-verbatim, that `export` succeeds, silently sets the variable to the literal
-text, and hands you a failure one command later that looks like a broken
-database rather than an untouched placeholder.
+> **`permission denied to create database`.** The common case, not an edge
+> case: a string handed to you for an existing database belongs to that
+> database's own user, who has no cluster-wide right to create one, and nothing
+> you can type from that connection fixes it. You need a superuser credential
+> for the instance, or whoever administers it to run the `CREATE DATABASE` and
+> hand back a string scoped to the new database.
 
-> **`permission denied to create database`.** This is the common case, not an
-> edge case. A connection string handed to you for an existing database
-> normally belongs to that database's own user, and that user has no
-> cluster-wide right to create databases — there is nothing you can type from
-> that connection that fixes it. You need either a superuser credential for the
-> instance, or whoever administers it to run the `CREATE DATABASE` and hand
-> back a connection string scoped to the new one.
-
-**Why it wants a database to itself.** The four core migrations create eight
-tables under plain, generic names: `accounts`, `meetings`, `attendees`, `people`,
-`person_identifiers`, `person_attendees`, `user_focus_profiles`,
-`crm_field_maps`. Point them at a database your business already uses and at
-least one of those names is likely already taken. Nothing gets destroyed —
-`CREATE TABLE` refuses rather than overwrites — but the migration stops
-partway, leaving a half-applied schema and an error whose cause is invisible
-unless you already knew which eight names to watch for.
+**Why it wants a database to itself.** The core migrations create their tables
+under plain, generic names — `accounts`, `meetings`, `attendees` and the rest.
+Point them at a database your business already uses and one of those names is
+likely taken. Nothing is destroyed, because `CREATE TABLE` refuses rather than
+overwrites, but the migration stops partway and leaves a half-applied schema
+whose cause is invisible unless you knew which names to watch.
 
 Now set the connection string the rest of this guide uses. This one is
 app-scoped: it names the new database, not the instance.
@@ -630,17 +587,13 @@ app-scoped: it names the new database, not the instance.
 export DATABASE_URL="postgresql://user:password@host:5432/quorom"
 ```
 
-> **This lasts until you close the terminal.** Every step below reads
-> `DATABASE_URL` — the migrations, `quorom init`, `import`, `weekly`. Open a
-> fresh tab tomorrow and it is simply not set, and `psql` quietly falls back to
-> a local Unix socket:
-> `could not connect to server: No such file or directory ... /tmp/.s.PGSQL.5432`.
-> That error names a socket path and never mentions the variable, which sends
-> you off to check your database when the problem is your shell. Two ways not
-> to lose an afternoon to it: re-run the `export` (and
-> `source .venv/bin/activate`) in every new terminal, or put the value in the
-> `.env` file of section 9, which `quorom` reads on every run. `psql` does not
-> read `.env`, so the migrations below need the export either way.
+> **This lasts until you close the terminal**, like the venv above. In a fresh
+> tab it is simply unset, and `psql` falls back to a local socket:
+> `could not connect to server: No such file or directory ... /tmp/.s.PGSQL.5432`
+> — an error that names a socket and never mentions the variable. Re-run the
+> `export` in each terminal, or put the value in the `.env` file of section 9,
+> which `quorom` reads on every run. `psql` does not read `.env`, so the
+> migrations below need the export either way.
 
 ### If you must share a database: a dedicated schema
 
@@ -703,7 +656,7 @@ psql "$DATABASE_URL" -c "\dt"
 ```
 
 You should see eight tables: `accounts`, `meetings`, `attendees`, `people`,
-`person_identifiers`, `person_attendees`, `user_focus_profiles`,
+`person_identifiers`, `person_attendees`, `user_focus_profiles` and
 `crm_field_maps`.
 
 Migrations are append-only once applied — your database is yours, not ours, and
@@ -990,12 +943,10 @@ for the reader of the map rather than for whoever stood the deployment up.
   `— no senior contact in Salesforce —` row rather than being left out.
 - Mobile numbers are reported as present or absent, never revealed or stored.
 - **No action is suggested per person.** The output says who is worth
-  considering and stops. Outreach is a sequence — connect, perhaps message,
-  perhaps request a meeting — and that sequence is not decided here.
+  considering and stops.
 - **Nobody is checked for still being at the company** unless an enrichment
-  provider is configured. CRM contacts go stale; without a provider the column
-  is absent rather than saying "not checked" on every row. With one, it is
-  `Still at company?` on tab 3 — the provider's view, which can be stale too.
+  provider is configured; with one, `Still at company?` on tab 3 gives the
+  provider's view, which can be stale too.
 
 ---
 
@@ -1123,8 +1074,10 @@ none of it is written back to the database. Re-run last week's window a month
 from now and you get the same meetings reconciled against a CRM that has since
 changed — a new map with an old date on it, not the map you produced.
 
-So a run that is not kept is gone. Keep all three files from every run: the
-`.xlsx`, the `.json` and the `.html`.
+So a run that is not kept is gone, and a year of runs answers what one cannot:
+who is new at this company, whose title changed, which coverage gap closed,
+which company went quiet. Keep all three files from every run — the `.xlsx`,
+the `.json` and the `.html`.
 
 Keep them somewhere private, readable back later, and under access you
 control. "Readable back" does not mean a live connection from wherever someone
@@ -1143,34 +1096,23 @@ chose and control, never into a clone of an upstream repository.
 #### Option A — your database
 
 You already have one. Section 8 had you provision PostgreSQL for the pipeline's
-own schema, so this adds a table rather than a system: nothing new to stand up,
-nothing new to pay for, and — the part most easily missed — no new write
-identity.
+own schema, so this adds a table rather than a system — and, the part most
+easily missed, **no new write identity.**
 
-That last one is the practical argument. A scheduled, unattended job that
-commits to version control needs a credential *into version control*: a deploy
-key or token to create, store where the runner can read it, and rotate on
-whatever schedule your organisation requires. The pipeline already holds
-database credentials, because it cannot run at all without them. Keeping runs
-in the database inherits an identity that exists; keeping them in a repository
-creates one.
+That is the practical argument. An unattended job that commits to version
+control needs a credential *into* version control: a deploy key or token to
+create, store where the runner can read it, and rotate. The pipeline already
+holds database credentials, because it cannot run without them. And that
+credential may not be yours to issue — on some platforms the token type that
+can write is disabled organisation-wide and the remaining one carries no write
+scope, neither of which is visible from the repository's own settings page.
+Worth finding out before you choose, because it is not a question of effort.
 
-**And that identity may not be yours to create.** Worth checking before you
-choose the repository, because it is not a question of effort. On one real
-deployment it was blocked twice over: project access tokens disabled at the
-group level — a setting owned by a platform team, not by the repository — and
-deploy tokens, the remaining option, carrying no write scope for the repository
-at all. Neither wall was visible from the repository's own settings page. The
-names differ between platforms; the shape does not. A database role you already
-hold has nothing equivalent to discover.
-
-Two smaller differences. These are binary files, the `.xlsx` especially, so a
-repository stores each week's copy whole rather than as a delta and never
-compacts it — a few megabytes a year at this size, which is not a problem, but
-it only grows. And a table can be asked questions: "which weeks do we have" is
-one line of SQL where in a repository it is a checkout. Nothing in Quorom reads
-`run_outputs` back — that SQL is yours to write, not a feature of the pipeline —
-but the option exists in one place and not the other.
+Two smaller differences. These are binary files, so a repository stores each
+week's copy whole and never compacts it — a few megabytes a year, which only
+grows. And a table can be asked "which weeks do we have" in one line of SQL,
+where a repository needs a checkout. Nothing in Quorom reads `run_outputs`
+back; that SQL is yours to write.
 
 Three steps.
 
@@ -1224,38 +1166,25 @@ inside the pipeline's own database, `runs/` is already in the layout section 5
 suggested, and if the `.json` dumps are what you will actually compare later, a
 repository diffs those natively.
 
-**The cost is a storage step you own.** Option A is written for you — the
-pipeline stores all three files as its last step once `RETAIN_RUNS` is on. Here
-you write and schedule the commit yourself, next to whatever runs the weekly
-job, and that step needs the write identity discussed above.
+**The cost is a storage step you own.** Option A is written for you; here you
+write and schedule the commit yourself, next to whatever runs the weekly job,
+using the write identity discussed above.
 
-The thing to weigh is that **git history is permanent by design.** That is what
-makes it a good record, and it is why this should be a decision rather than a
-default. These files carry real people's names, titles and CRM state; a commit
-cannot practically be un-made; and repository access at most companies is wider
-than the set of people who should be reading a stakeholder map. For many
-deployments that is a fair trade — it is your own private repository, and the
-same data already sits in your CRM and your database under access that is no
-narrower. If your organisation has a process for removing an individual's data
-on request, it is the wrong trade, and Option A is the safer default.
+The thing to weigh is that **git history is permanent by design**, which is what
+makes it a good record and why this should be a decision rather than a default.
+A commit cannot practically be un-made, and repository access at most companies
+is wider than the set of people who should be reading a stakeholder map. For
+many deployments that is a fair trade: it is your own private repository, and
+the same data sits in your CRM under access no narrower. If your organisation
+has a process for removing an individual's data on request, it is the wrong
+trade, and Option A is the safer default.
 
 #### Durability is not automatic either way
 
-Worth stating plainly, because it is the property people most often assume they
-already have. Git history is permanent by construction — but only on the
-machines holding a copy of it. A database is durable exactly as far as its
-backups and point-in-time recovery reach, which is a question about your
-hosting rather than about PostgreSQL.
-
-Whichever you choose, find out what the answer actually is for your setup
-before you rely on it. This guide cannot tell you, and a retention plan resting
-on an unexamined assumption about backups is not yet a retention plan.
-
-**Why bother.** One run is a snapshot, and answers who you met. A year of runs
-is a series, and answers the questions actually worth asking — who is new at
-this company, whose title changed, which coverage gap closed, which company went
-quiet. None of that can be read from a single file, and none of it can be
-recovered later from runs you did not keep.
+Permanence is not durability. Git history is permanent only on the machines
+holding a copy, and a database is durable exactly as far as its backups and
+point-in-time recovery reach — a question about your hosting rather than about
+PostgreSQL. Find out what the answer is for your setup before relying on it.
 
 ---
 
@@ -1302,8 +1231,8 @@ The failure this produces is worth recognising, because it does not look like a
 version problem: something you read about in these docs is simply *not there* —
 a file the run was supposed to write, a flag the CLI does not accept, a column
 that never appears. Check what your deployment is pinned to before concluding
-anything is broken. One real deployment spent a debugging session on a manifest
-file that had landed upstream a week after the commit it was pinned to.
+anything is broken: a file the docs describe and a deployment does not write is
+usually a pin, not a defect.
 
 A new migration is numbered above the highest one you have applied; apply the
 ones you have not, in filename order.

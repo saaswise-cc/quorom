@@ -130,9 +130,7 @@ the conflict clause specifically, separately from `INSERT` — so a role granted
 table, not the clause, and it arrives at the end of a run after all the work is
 done. One real deployment lost a run to exactly this.
 
-**It is a trade, not a detail.** §14 grants `INSERT, SELECT` and withholds
-`UPDATE` deliberately: that is what makes the history append-only by privilege
-rather than by good intentions, and it is why the pipeline's own retention uses
-a plain `INSERT` and treats a re-run as a second row that really happened.
-Adding `UPDATE` so a re-run overwrites in place is a reasonable choice — it is
-just a different one, and worth making on purpose. Withhold `DELETE` either way.
+**It is a trade, not a detail.** Granting `UPDATE` so a re-run overwrites in
+place gives up the append-only property §14 withholds it for. A reasonable
+choice, and worth making on purpose rather than while fixing an error. Withhold
+`DELETE` either way.

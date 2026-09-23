@@ -122,13 +122,11 @@ happens in your own systems.
 | A row on tab 4, the review queue | Your CRM and the enrichment provider disagree, or one is missing a value | Check the place the row names — usually LinkedIn — and correct whichever source is wrong. Only with a provider configured. |
 
 **No action is suggested per person, deliberately.** The output says who is
-worth considering and stops. Outreach is a sequence — connect, perhaps message,
-perhaps request a meeting — and the run does not decide that sequence for you.
+worth considering and stops; the outreach sequence is not decided for you.
 
-**Nobody is checked for still being at the company** — unless an enrichment
-provider is configured. CRM contacts go stale and, on its own, the run cannot
-tell. Without a provider there is no column claiming otherwise, which is
-preferable to one that says "not checked" on every row.
+**Nobody is checked for still being at the company** unless an enrichment
+provider is configured — CRM contacts go stale, and on its own the run cannot
+tell.
 
 ## If an enrichment provider is configured
 

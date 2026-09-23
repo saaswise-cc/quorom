@@ -36,20 +36,9 @@ Five things are resolved: employee count, HQ country, HQ city, HQ state, and the
 person's LinkedIn URL. Each records which column it feeds and why each rejected
 candidate was rejected.
 
-Two details worth knowing, because both were forced by real data rather than
-designed in advance:
-
-**The map keeps a list, not a winner.** In one real week, several of the
-companies met had an empty country in one source and a populated one in
-another. A map that stored only the best-populated field would have blanked
-their HQ and dropped at least one company out of the ICP set entirely.
-
-**Population alone picks the wrong field.** In one org the best-populated field
-matching `/linkedin/` on `Contact` was the *company's* LinkedIn page, by some
-margin, not the person's. Counting tells you which field has data, not which field means
-what you want. That is why exclusion patterns carry as much weight as inclusion
-ones, and why every rejection is stored with the rule that rejected it — so a
-wrong match is visible instead of silent.
+It keeps a list per logical field rather than a winner, and weighs exclusions
+as heavily as inclusions — both forced by real data, and both explained in
+`docs/pipeline.md`, step 0b.
 
 If nothing resolves for a logical field, its column reads **"not available in
 this CRM"** and the run continues. Gaps are output, not failure.

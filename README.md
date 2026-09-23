@@ -128,20 +128,11 @@ that map. Unresolved fields degrade their column to an explicit "not available
 in this CRM" instead of failing the run. The repository holds only the patterns
 and the standard fields.
 
-Two things about it were forced by real data rather than designed in advance,
-and both are worth knowing before you read a field-map report:
-
-**It keeps a list per logical field, not a winner.** In one org, several of the
-companies met in a single week had an empty country in the best-populated field
-and a populated one in the next. A map storing only the winner would have
-blanked their HQ and dropped at least one of them out of the ICP set.
-
-**Population alone picks the wrong field.** In the same org, the best-populated
-field matching `/linkedin/` on `Contact` was the *company's* page, beating the
-person's profile URL. Counting tells you which field has data, not which field
-means what you want. That is why exclusion patterns carry as much weight as
-inclusion ones, and why every rejection is stored with the rule that rejected
-it — so a wrong match is visible instead of silent.
+Two things about it were forced by real data: it keeps a **list** per logical
+field rather than a winner, because the best-populated field is empty on some
+rows where the next one is not; and population alone picks the wrong field, so
+exclusions carry as much weight as inclusions and every rejection is stored with
+the rule that rejected it. `docs/pipeline.md`, step 0b, has both in full.
 
 ### Provider rule
 
