@@ -566,6 +566,10 @@ export ADMIN_DATABASE_URL="<paste the admin connection string here>"
 psql "$ADMIN_DATABASE_URL" -c "CREATE DATABASE quorom;"
 ```
 
+The angle brackets go too (section 3). Run that line verbatim and the export
+succeeds, setting the variable to the literal text, and the failure arrives one
+command later looking like a broken database.
+
 > **`permission denied to create database`.** The common case, not an edge
 > case: a string handed to you for an existing database belongs to that
 > database's own user, who has no cluster-wide right to create one, and nothing
